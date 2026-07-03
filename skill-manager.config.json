@@ -1,0 +1,30 @@
+{
+  "backupDir": "./backups",
+  "devDir": "",
+  "ruleTemplateDir": "./library/rules",
+  "server": {
+    "host": "127.0.0.1",
+    "port": 47821
+  },
+  "targets": {
+    "claude": {
+      "enabled": true,
+      "userSkillPath": "%USERPROFILE%/.claude/skills",
+      "projectSkillPath": ".claude/skills",
+      "projectRuleFile": "CLAUDE.md"
+    },
+    "codex": {
+      "enabled": true,
+      "userSkillPath": "%USERPROFILE%/.agents/skills",
+      "projectSkillPath": ".agents/skills",
+      "projectRuleFile": "AGENTS.md"
+    },
+    "gemini": {
+      "enabled": true,
+      "userSkillPath": "%USERPROFILE%/.gemini/antigravity-ide/plugins/justafter-skill-manager/skills",
+      "projectSkillPath": ".gemini/skills",
+      "projectRuleFile": "GEMINI.md"
+    }
+  },
+  "projects": []
+}

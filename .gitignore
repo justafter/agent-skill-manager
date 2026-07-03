@@ -1,0 +1,12 @@
+node_modules/
+dist/
+web/dist/
+.vite/
+coverage/
+.env
+*.log
+backups/*
+!backups/.gitkeep
+library/skills/*
+!library/skills/.gitkeep
+*.tsbuildinfo
