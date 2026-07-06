@@ -13,13 +13,13 @@ export function BackupPage() {
     try {
       setIsSubmitting(true)
       await apiPost('/api/backups', {
-        reason: reason.trim() || 'Manual backup from Web UI'
+        reason: reason.trim() || '来自 Web UI 的手动备份'
       })
       setReason('')
       setShowCreateForm(false)
       await refetch()
     } catch (err) {
-      alert(`Failed to create backup: ${(err as Error).message}`)
+      alert(`创建备份失败: ${(err as Error).message}`)
     } finally {
       setIsSubmitting(false)
     }
@@ -27,24 +27,24 @@ export function BackupPage() {
 
   const handleRestore = async (backupId: string) => {
     const ok = window.confirm(
-      `WARNING: Are you sure you want to restore backup [${backupId}]? This will completely overwrite your current registry.json and local library folders back to the backup state. This action cannot be undone.`
+      `警告：您确定要恢复备份 [${backupId}] 吗？这将完全覆写您当前的 registry.json 以及本地 Skill 库文件夹，使它们回滚到备份时的状态。此操作无法撤销。`
     )
     if (!ok) return
 
     try {
       setIsSubmitting(true)
       const res = await apiPost<any>('/api/restore', { backupId })
-      alert(`[Success] Restored successfully! ${res.index.items.length} items were reverted.`)
+      alert(`[成功] 恢复成功！已回滚 ${res.index.items.length} 项。`)
       await refetch()
     } catch (err) {
-      alert(`Restore failed: ${(err as Error).message}`)
+      alert(`恢复失败: ${(err as Error).message}`)
     } finally {
       setIsSubmitting(false)
     }
   }
 
   if (isLoading) {
-    return <div className="page"><div className="empty-state">Loading backups...</div></div>
+    return <div className="page"><div className="empty-state">正在加载备份...</div></div>
   }
 
   const backups = data?.backups || []
@@ -52,13 +52,13 @@ export function BackupPage() {
   return (
     <section className="page" style={{ maxWidth: '900px', margin: '0 auto' }}>
       <div className="toolbar" style={{ marginBottom: '24px' }}>
-        <h2>Backup & Restore Archives</h2>
+        <h2>备份与恢复归档</h2>
         <button
           className="button button-primary"
           onClick={() => setShowCreateForm(!showCreateForm)}
           disabled={isSubmitting}
         >
-          {showCreateForm ? 'Cancel' : 'Create Snapshot Backup'}
+          {showCreateForm ? '取消' : '创建快照备份'}
         </button>
       </div>
 
@@ -74,13 +74,13 @@ export function BackupPage() {
           }}
         >
           <div className="form-group" style={{ margin: 0 }}>
-            <label htmlFor="reason" style={{ fontWeight: 600, fontSize: '14px' }}>Backup Reason / Note</label>
+            <label htmlFor="reason" style={{ fontWeight: 600, fontSize: '14px' }}>备份原因 / 备注说明</label>
             <div style={{ display: 'flex', gap: '12px', marginTop: '6px' }}>
               <input
                 id="reason"
                 type="text"
                 className="form-input"
-                placeholder="e.g. Before refactoring core skills"
+                placeholder="例如：重构核心 Skill 之前"
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 disabled={isSubmitting}
@@ -91,7 +91,7 @@ export function BackupPage() {
                 style={{ whiteSpace: 'nowrap' }}
                 disabled={isSubmitting}
               >
-                {isSubmitting ? 'Saving...' : 'Save Backup'}
+                {isSubmitting ? '正在保存...' : '保存备份'}
               </button>
             </div>
           </div>
@@ -99,7 +99,7 @@ export function BackupPage() {
       )}
 
       {backups.length === 0 ? (
-        <div className="empty-state">No backup archives found. All backups created manually or automatically will be displayed here.</div>
+        <div className="empty-state">未找到任何备份归档。手动或自动创建的所有备份都将显示在此处。</div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {backups.map((bk: any) => (
@@ -128,7 +128,7 @@ export function BackupPage() {
                     {bk.backupId}
                   </strong>
                   <div style={{ fontSize: '12px', color: '#57606a', marginTop: '4px' }}>
-                    Created: {new Date(bk.createdAt).toLocaleString()}
+                    创建时间: {new Date(bk.createdAt).toLocaleString()}
                   </div>
                 </div>
                 <button
@@ -137,16 +137,16 @@ export function BackupPage() {
                   onClick={() => handleRestore(bk.backupId)}
                   disabled={isSubmitting}
                 >
-                  Restore this Backup
+                  恢复此备份
                 </button>
               </div>
 
               <div style={{ fontSize: '14px', color: '#354557', marginBottom: '12px' }}>
-                <strong>Reason:</strong> {bk.reason}
+                <strong>备份原因:</strong> {bk.reason}
               </div>
 
               <div style={{ fontSize: '13px' }}>
-                <div style={{ fontWeight: 600, color: '#57606a', marginBottom: '6px' }}>Archived Items ({bk.items.length}):</div>
+                <div style={{ fontWeight: 600, color: '#57606a', marginBottom: '6px' }}>已归档项目 ({bk.items.length}):</div>
                 <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: '6px', border: '1px solid #e6ebf1' }}>
                   {bk.items.map((item: any, idx: number) => (
                     <div
@@ -160,7 +160,7 @@ export function BackupPage() {
                       }}
                     >
                       <span style={{ color: '#0969da', fontWeight: 500 }}>
-                        {item.skillName ? `Skill: ${item.skillName}` : item.type === 'registry' ? 'Registry Snapshot' : 'Global Skills Library'}
+                        {item.skillName ? `Skill: ${item.skillName}` : item.type === 'registry' ? '注册表快照' : '全局 Skill 库'}
                       </span>
                       <span style={{ color: '#57606a', fontFamily: 'monospace' }}>{item.type}</span>
                     </div>

@@ -8,7 +8,7 @@ export function SkillsPage() {
   const { data: config } = useApi<any>('config', '/api/config')
   const { data: skillsData, refetch, isLoading } = useApi<any>('skills', '/api/skills')
 
-  const [activeTab, setActiveTab] = useState<'all' | 'missing' | 'synced' | 'conflict' | 'project'>('all')
+  const [activeTab, setActiveTab] = useState<string>('all')
   const [isScanning, setIsScanning] = useState(false)
 
   // Sync state
@@ -27,29 +27,10 @@ export function SkillsPage() {
       await apiPost('/api/scan')
       await refetch()
     } catch (err) {
-      alert(`Scan failed: ${(err as Error).message}`)
+      alert(`扫描失败: ${(err as Error).message}`)
     } finally {
       setIsScanning(false)
     }
-  }
-
-  const handlePlanSync = async (toTarget?: string, fromTarget?: string, forceModify = false) => {
-    if (!currentSkill && !forceModify) return
-
-    const skillName = forceModify ? currentSkill! : toTarget ? (fromTarget ? 'local' : toTarget) : 'all'
-    const actualSkillName = forceModify ? currentSkill! : (fromTarget ? fromTarget : toTarget ? toTarget : '') // wait
-
-    // Actually, onPlanSync in SkillCard passes:
-    // toTarget: targetKey (e.g. claude:user), fromTarget: undefined -> PUSH
-    // toTarget: 'local', fromTarget: targetKey (e.g. claude:user) -> PULL
-    // toTarget: undefined, fromTarget: undefined -> PUSH ALL TARGETS
-    
-    // So the skill we want to sync is the one clicked. How do we get the clicked skill name?
-    // We can store it or pass it as first parameter!
-    // Let's look at SkillCardProps: onPlanSync: (toTarget?: string, fromTarget?: string) => void
-    // Let's modify SkillCard to pass name or bind it. In SkillCard: onClick={() => onPlanSync(targetKey)}
-    // It doesn't pass skill name. But we can bind the name inside SkillsPage when rendering SkillCard!
-    // e.g. onPlanSync={(to, from) => triggerPlan(skill.name, to, from)}
   }
 
   const triggerPlan = async (skillName: string, toTarget?: string, fromTarget?: string, currentModifyVal = false) => {
@@ -60,10 +41,13 @@ export function SkillsPage() {
       setCurrentToTarget(toTarget)
       setCurrentFromTarget(fromTarget)
 
+      // toTarget === 'local' 表示反向拉取（pull），需要传 from；
+      // 否则按 D3a push 语义处理。
+      const isPull = toTarget === 'local' && !!fromTarget
       const body = {
         skillName,
-        targets: toTarget ? [toTarget] : undefined,
-        from: fromTarget,
+        targets: !isPull && toTarget ? [toTarget] : undefined,
+        from: isPull ? fromTarget : undefined,
         allowManagedModify: currentModifyVal
       }
 
@@ -71,7 +55,7 @@ export function SkillsPage() {
       setPlanResult(res)
       setPlanDialogOpen(true)
     } catch (err) {
-      alert(`Failed to create plan: ${(err as Error).message}`)
+      alert(`创建同步计划失败: ${(err as Error).message}`)
     } finally {
       setIsSubmittingPlan(false)
     }
@@ -103,8 +87,25 @@ export function SkillsPage() {
     }
   }
 
+  const handleImportUntracked = async (path: string) => {
+    try {
+      setIsScanning(true)
+      const res = await apiPost<any>('/api/import', {
+        path,
+        force: false,
+        skip: true
+      })
+      alert(`[成功] 已成功导入并托管技能: ${res.skill.name}`)
+      await refetch()
+    } catch (err) {
+      alert(`导入失败: ${(err as Error).message}`)
+    } finally {
+      setIsScanning(false)
+    }
+  }
+
   if (isLoading || !config || !skillsData) {
-    return <div className="page"><div className="empty-state">Loading skills...</div></div>
+    return <div className="page"><div className="empty-state">正在加载 Skill...</div></div>
   }
 
   const enabledTargets = Object.entries(config.targets)
@@ -113,20 +114,17 @@ export function SkillsPage() {
 
   const skills = skillsData.skills || []
 
+  const getAgentCount = (targetKey: string) => {
+    return skills.filter((s: any) => s.targets && s.targets[targetKey] && s.targets[targetKey] !== 'missing').length
+  }
+
   // Filter skills
   const filteredSkills = skills.filter((s: any) => {
-    const targetStatuses = Object.values(s.targets || {}) as string[]
-    if (activeTab === 'missing') {
-      return targetStatuses.includes('missing')
+    if (activeTab === 'all') {
+      return true
     }
-    if (activeTab === 'synced') {
-      return enabledTargets.length > 0 && enabledTargets.every(t => s.targets[t] === 'identical')
-    }
-    if (activeTab === 'conflict') {
-      return targetStatuses.includes('conflict') || targetStatuses.includes('changed')
-    }
-    if (activeTab === 'project') {
-      return s.projectInstalls && s.projectInstalls.length > 0
+    if (activeTab.includes(':user')) {
+      return s.targets && s.targets[activeTab] && s.targets[activeTab] !== 'missing'
     }
     return true
   })
@@ -134,55 +132,124 @@ export function SkillsPage() {
   return (
     <section className="page">
       <div className="toolbar">
-        <h2>Skills Library</h2>
+        <h2>Skill 库</h2>
         <button
           className="button button-primary"
           type="button"
           onClick={handleScan}
           disabled={isScanning}
         >
-          {isScanning ? 'Scanning...' : 'Scan Target Directories'}
+          {isScanning ? '正在扫描...' : '扫描目标目录'}
         </button>
       </div>
 
-      <div className="tabs">
-        <button className={`tab-btn ${activeTab === 'all' ? 'active' : ''}`} onClick={() => setActiveTab('all')}>全部 ({skills.length})</button>
-        <button className={`tab-btn ${activeTab === 'missing' ? 'active' : ''}`} onClick={() => setActiveTab('missing')}>缺失 ({skills.filter((s: any) => Object.values(s.targets || {}).includes('missing')).length})</button>
-        <button className={`tab-btn ${activeTab === 'synced' ? 'active' : ''}`} onClick={() => setActiveTab('synced')}>已同步 ({skills.filter((s: any) => enabledTargets.length > 0 && enabledTargets.every(t => s.targets[t] === 'identical')).length})</button>
-        <button className={`tab-btn ${activeTab === 'conflict' ? 'active' : ''}`} onClick={() => setActiveTab('conflict')}>冲突 ({skills.filter((s: any) => Object.values(s.targets || {}).some(st => st === 'conflict' || st === 'changed')).length})</button>
-        <button className={`tab-btn ${activeTab === 'project' ? 'active' : ''}`} onClick={() => setActiveTab('project')}>项目级 ({skills.filter((s: any) => s.projectInstalls && s.projectInstalls.length > 0).length})</button>
+      <div className="filter-bar">
+        <button 
+          className={`filter-pill ${activeTab === 'all' ? 'active' : ''}`} 
+          onClick={() => setActiveTab('all')}
+        >
+          已安装
+        </button>
+        <button 
+          className={`filter-pill filter-claude ${activeTab === 'claude:user' ? 'active' : ''}`} 
+          onClick={() => setActiveTab('claude:user')}
+        >
+          Claude: <strong>{getAgentCount('claude:user')}</strong>
+        </button>
+        <button 
+          className={`filter-pill filter-codex ${activeTab === 'codex:user' ? 'active' : ''}`} 
+          onClick={() => setActiveTab('codex:user')}
+        >
+          Codex: <strong>{getAgentCount('codex:user')}</strong>
+        </button>
+        <button 
+          className={`filter-pill filter-gemini ${activeTab === 'gemini:user' ? 'active' : ''}`} 
+          onClick={() => setActiveTab('gemini:user')}
+        >
+          Gemini: <strong>{getAgentCount('gemini:user')}</strong>
+        </button>
       </div>
 
       {filteredSkills.length === 0 ? (
-        <div className="empty-state">No skills match the selected status filter.</div>
+        <div className="empty-state">没有与当前筛选条件匹配的 Skill。</div>
       ) : (
-        <table className="table">
-          <thead>
-            <tr>
-              <th style={{ width: '25%' }}>Name</th>
-              <th style={{ width: '40%' }}>Description</th>
-              <th style={{ width: '25%' }}>Target Sync Status</th>
-              <th style={{ width: '10%', textAlign: 'right' }}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredSkills.map((skill: any) => (
-              <SkillCard
-                key={skill.name}
-                name={skill.name}
-                description={skill.description}
-                version={skill.version}
-                checksum={skill.checksum}
-                targets={skill.targets || {}}
-                syncedTargets={skill.syncedTargets || []}
-                projectInstalls={skill.projectInstalls || []}
-                enabledTargets={enabledTargets}
-                onPlanSync={(to, from) => triggerPlan(skill.name, to, from, allowManagedModify)}
-              />
-            ))}
-          </tbody>
-        </table>
+        <div className="skill-list">
+          {filteredSkills.map((skill: any) => (
+            <SkillCard
+              key={skill.name}
+              name={skill.name}
+              description={skill.description}
+              version={skill.version}
+              checksum={skill.checksum}
+              targets={skill.targets || {}}
+              syncedTargets={skill.syncedTargets || []}
+              projectInstalls={skill.projectInstalls || []}
+              enabledTargets={enabledTargets}
+              onPlanSync={(to, from) => triggerPlan(skill.name, to, from, allowManagedModify)}
+            />
+          ))}
+        </div>
       )}
+
+      {(() => {
+        const untracked = skillsData.untracked || {}
+        const hasUntracked = Object.values(untracked).some((arr: any) => arr.length > 0)
+        if (!hasUntracked) return null
+
+        return (
+          <div style={{ marginTop: '32px' }}>
+            <h3 style={{ fontSize: '16px', color: '#17202a', marginBottom: '8px' }}>检测到未托管的技能 (Untracked)</h3>
+            <p style={{ color: '#57606a', fontSize: '13px', marginBottom: '16px' }}>
+              以下技能存在于目标 Agent 的用户目录下，但尚未登记到本地管理器中。您可以一键导入进行统一管理。
+            </p>
+            
+            <div className="skill-list">
+              {Object.entries(untracked).flatMap(([targetKey, list]: any) => 
+                list.map((item: any) => {
+                  const agentName = targetKey.split(':')[0]
+                  return (
+                    <div key={`${targetKey}-${item.name}`} className="skill-row">
+                      <div className="skill-left">
+                        <div className="skill-name-row">
+                          <h4 className="skill-title">{item.name}</h4>
+                          <span className="skill-tag" style={{ background: '#e1f5fe', color: '#0288d1' }}>未托管</span>
+                          <span 
+                            className="skill-tag" 
+                            style={
+                              agentName === 'claude' 
+                                ? { background: '#fdf0ec', color: '#c05621' } 
+                                : agentName === 'codex' 
+                                ? { background: '#ebfbee', color: '#2f855a' } 
+                                : agentName === 'gemini' 
+                                ? { background: '#ebf8ff', color: '#2b6cb0' } 
+                                : { background: '#faf5ff', color: '#6b46c1' }
+                            }
+                          >
+                            来自 {agentName}
+                          </span>
+                        </div>
+                        <p style={{ fontSize: '12px', fontFamily: 'monospace', color: '#718096', margin: '4px 0 0 0' }}>
+                          路径: {item.path}
+                        </p>
+                      </div>
+                      <div className="skill-right">
+                        <button
+                          className="button button-primary"
+                          style={{ padding: '6px 14px', fontSize: '13px' }}
+                          onClick={() => handleImportUntracked(item.path)}
+                          disabled={isScanning}
+                        >
+                          一键导入
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })
+              )}
+            </div>
+          </div>
+        )
+      })()}
 
       <PlanConfirmDialog
         open={planDialogOpen}

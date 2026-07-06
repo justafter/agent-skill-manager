@@ -3,5 +3,5 @@ export interface DiffViewProps {
 }
 
 export function DiffView({ diff }: DiffViewProps) {
-  return <pre>{diff || 'No diff selected.'}</pre>
+  return <pre>{diff || '没有选择差异文件。'}</pre>
 }

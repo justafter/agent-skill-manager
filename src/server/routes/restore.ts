@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import { AppError } from '../../utils/errors.js'
 import { restoreBackup } from '../../backup/restore.js'
 
 export function restoreRouter(): Router {
@@ -7,8 +8,7 @@ export function restoreRouter(): Router {
     try {
       const backupId = req.body.backupId ? String(req.body.backupId) : undefined
       if (!backupId) {
-        res.status(400).json({ error: 'Missing backupId parameter' })
-        return
+        throw new AppError('VALIDATION_ERROR', 'Missing backupId parameter')
       }
       const index = await restoreBackup(backupId)
       res.json({ success: true, index })

@@ -81,25 +81,71 @@ a {
   margin-bottom: 16px;
 }
 
-.table {
-  width: 100%;
-  border-collapse: collapse;
+/* Skill List Layout */
+.skill-list {
   background: #ffffff;
-  border: 1px solid #d8dee9;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  padding: 8px 24px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.02);
 }
 
-.table th,
-.table td {
-  padding: 12px 14px;
-  border-bottom: 1px solid #e6ebf1;
-  text-align: left;
-  font-size: 14px;
+.skill-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 0;
+  border-bottom: 1px solid #edf2f7;
 }
 
-.table th {
-  background: #f9fbfd;
-  color: #526171;
+.skill-row:last-child {
+  border-bottom: none;
+}
+
+.skill-left {
+  flex: 1;
+  padding-right: 24px;
+}
+
+.skill-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.skill-title {
+  font-size: 16px;
   font-weight: 600;
+  color: #1a202c;
+  margin: 0;
+}
+
+.skill-tag {
+  background: #edf2f7;
+  color: #718096;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.skill-description {
+  font-size: 13px;
+  color: #4a5568;
+  margin: 0;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.skill-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .empty-state {
@@ -226,56 +272,210 @@ a {
   color: #cf222e;
 }
 
-/* Tabs */
-.tabs {
+/* Filter Bar & Pills */
+.filter-bar {
   display: flex;
-  gap: 4px;
-  margin-bottom: 16px;
-  border-bottom: 1px solid #d8dee9;
-  padding-bottom: 8px;
+  gap: 12px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  align-items: center;
+  flex-wrap: wrap;
 }
 
-.tab-btn {
-  background: transparent;
-  border: none;
-  padding: 6px 12px;
-  border-radius: 6px;
+.filter-pill {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 20px;
+  padding: 8px 16px;
   cursor: pointer;
-  font-weight: 500;
-  color: #57606a;
   font-size: 14px;
-  transition: all 0.2s;
-}
-
-.tab-btn:hover {
-  background: #eaeef2;
-}
-
-.tab-btn.active {
-  background: #1f6feb;
-  color: #ffffff;
-}
-
-/* Targets List */
-.target-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.target-row {
+  color: #4a5568;
+  font-weight: 500;
+  transition: all 0.2s ease;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 6px 10px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 6px;
+  gap: 6px;
 }
 
-.target-actions {
+.filter-pill strong {
+  font-weight: 700;
+}
+
+.filter-pill:hover:not(:disabled) {
+  background: #f7fafc;
+  border-color: #cbd5e0;
+}
+
+.filter-pill.active {
+  border-color: #17202a;
+  color: #17202a;
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+/* Specific Pill Colors (based on screenshot) */
+.filter-pill.filter-claude {
+  background: #fdf0ec;
+  color: #c05621;
+  border-color: transparent;
+}
+.filter-pill.filter-claude.active {
+  border-color: #c05621;
+}
+
+.filter-pill.filter-codex {
+  background: #ebfbee;
+  color: #2f855a;
+  border-color: transparent;
+}
+.filter-pill.filter-codex.active {
+  border-color: #2f855a;
+}
+
+.filter-pill.filter-gemini {
+  background: #ebf8ff;
+  color: #2b6cb0;
+  border-color: transparent;
+}
+.filter-pill.filter-gemini.active {
+  border-color: #2b6cb0;
+}
+
+
+/* Target Agent Circular Buttons */
+.agent-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
   display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  color: #a0aec0;
+  position: relative;
+}
+
+.agent-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+}
+
+/* Agent Button Active/Status Colors */
+.agent-btn.agent-claude.active-identical {
+  background: #fdf0ec;
+  border-color: #fbd38d;
+  color: #dd6b20;
+}
+.agent-btn.agent-claude.active-changed,
+.agent-btn.agent-claude.active-conflict {
+  background: #fffaf0;
+  border-color: #fbd38d;
+  color: #dd6b20;
+}
+
+.agent-btn.agent-codex.active-identical {
+  background: #ebfbee;
+  border-color: #c6f6d5;
+  color: #38a169;
+}
+.agent-btn.agent-codex.active-changed,
+.agent-btn.agent-codex.active-conflict {
+  background: #f0fff4;
+  border-color: #c6f6d5;
+  color: #38a169;
+}
+
+.agent-btn.agent-gemini.active-identical {
+  background: #ebf8ff;
+  border-color: #bee3f8;
+  color: #3182ce;
+}
+.agent-btn.agent-gemini.active-changed,
+.agent-btn.agent-gemini.active-conflict {
+  background: #f7fafc;
+  border-color: #bee3f8;
+  color: #3182ce;
+}
+
+/* Status Indicator Dot on Button */
+.status-dot {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1.5px solid #ffffff;
+}
+
+.status-dot.dot-changed {
+  background: #dd6b20; /* Orange dot */
+}
+
+.status-dot.dot-conflict {
+  background: #e53e3e; /* Red dot */
+}
+
+/* Inline Dropdown Popover */
+.popover-menu {
+  position: absolute;
+  top: 48px;
+  right: 0;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 8px;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  z-index: 100;
+  min-width: 160px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.popover-header {
+  font-size: 11px;
+  color: #718096;
+  padding: 4px 8px;
+  border-bottom: 1px solid #edf2f7;
+  margin-bottom: 4px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.popover-item {
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  padding: 6px 12px;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+  color: #2d3748;
+  display: flex;
+  align-items: center;
   gap: 6px;
+  width: 100%;
+  transition: background 0.15s ease;
+}
+
+.popover-item:hover {
+  background: #f7fafc;
+  color: #1a202c;
+}
+
+.popover-item.danger {
+  color: #e53e3e;
+}
+.popover-item.danger:hover {
+  background: #fff5f5;
 }
 
 /* Form Groups */

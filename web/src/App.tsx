@@ -10,13 +10,13 @@ export function App() {
       <header className="app-header">
         <div>
           <h1>Agent Skill Manager</h1>
-          <p>Local skill library, target sync, project rules, and backups.</p>
+          <p>本地 Skill 库，目标同步，项目规则与备份管理。</p>
         </div>
         <nav className="app-nav">
-          <NavLink to="/">Skills</NavLink>
-          <NavLink to="/projects">Projects</NavLink>
-          <NavLink to="/import">Import</NavLink>
-          <NavLink to="/backups">Backups</NavLink>
+          <NavLink to="/">Skill 列表</NavLink>
+          <NavLink to="/projects">项目空间</NavLink>
+          <NavLink to="/import">导入技能</NavLink>
+          <NavLink to="/backups">备份管理</NavLink>
         </nav>
       </header>
 

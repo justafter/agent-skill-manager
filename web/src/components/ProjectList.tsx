@@ -4,15 +4,15 @@ export interface ProjectListProps {
 
 export function ProjectList({ projects }: ProjectListProps) {
   if (projects.length === 0) {
-    return <div className="empty-state">No projects registered.</div>
+    return <div className="empty-state">未注册任何项目。</div>
   }
 
   return (
     <table className="table">
       <thead>
         <tr>
-          <th>Name</th>
-          <th>Path</th>
+          <th>项目名称</th>
+          <th>项目路径</th>
         </tr>
       </thead>
       <tbody>

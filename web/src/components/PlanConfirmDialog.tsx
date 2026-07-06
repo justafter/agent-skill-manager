@@ -47,11 +47,18 @@ export function PlanConfirmDialog({
   const { plan, summary } = planResult
   const hasConflicts = summary.conflict > 0
 
+  const kindLabels: Record<string, string> = {
+    create: '新增',
+    modify: '修改',
+    skip: '跳过',
+    conflict: '冲突'
+  }
+
   return (
     <div className="modal-overlay" onClick={onCancel}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <span>Sync Plan Confirmation</span>
+          <span>同步计划确认</span>
           <button className="button" style={{ padding: '4px 8px' }} onClick={onCancel} disabled={isSubmitting}>
             &times;
           </button>
@@ -59,22 +66,22 @@ export function PlanConfirmDialog({
 
         <div className="modal-body">
           <div style={{ marginBottom: '16px', fontSize: '13px', color: '#57606a' }}>
-            <div><strong>Plan ID:</strong> {plan.planId}</div>
-            <div><strong>Source:</strong> {plan.source}</div>
+            <div><strong>计划 ID:</strong> {plan.planId}</div>
+            <div><strong>源端:</strong> {plan.source}</div>
           </div>
 
           <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
             <span className="badge badge-missing" style={{ background: '#e1f5fe', color: '#0288d1' }}>
-              Create: {summary.create}
+              新增: {summary.create}
             </span>
             <span className="badge badge-changed">
-              Modify: {summary.modify}
+              修改: {summary.modify}
             </span>
             <span className="badge badge-identical">
-              Skip: {summary.skip}
+              跳过: {summary.skip}
             </span>
             <span className="badge badge-conflict">
-              Conflict: {summary.conflict}
+              冲突: {summary.conflict}
             </span>
           </div>
 
@@ -87,14 +94,14 @@ export function PlanConfirmDialog({
                 disabled={isSubmitting}
               />
               <span style={{ fontSize: '13px', fontWeight: 500 }}>
-                Allow overwriting managed targets that have changed (--allow-managed-modify)
+                允许覆写已被管理器托管但已发生变更的目标 (--allow-managed-modify)
               </span>
             </label>
           </div>
 
           {hasConflicts && (
             <div className="empty-state" style={{ color: '#da3633', background: '#ffebe9', border: '1px solid #ffc8c4', padding: '12px', marginBottom: '16px', fontSize: '13px' }}>
-              <strong>Warning:</strong> Unresolved conflicts exist. You must check the checkbox above to authorize overwriting these changed directories, or they will be skipped during apply.
+              <strong>警告:</strong> 存在未解决的冲突。您必须勾选上面的复选框来授权覆写这些已变更的目录，否则在执行应用时它们将被跳过。
             </div>
           )}
 
@@ -104,7 +111,7 @@ export function PlanConfirmDialog({
             </div>
           )}
 
-          <div style={{ fontWeight: 600, fontSize: '14px', marginBottom: '8px' }}>Detailed Changes:</div>
+          <div style={{ fontWeight: 600, fontSize: '14px', marginBottom: '8px' }}>变更详情:</div>
           <div style={{ border: '1px solid #e6ebf1', borderRadius: '6px', maxHeight: '200px', overflowY: 'auto' }}>
             {plan.items.map((item, idx) => (
               <div
@@ -119,11 +126,11 @@ export function PlanConfirmDialog({
                 }}
               >
                 <div>
-                  <span style={{ fontWeight: 600, color: '#354557' }}>{item.targetKey || 'local'}</span>
+                  <span style={{ fontWeight: 600, color: '#354557' }}>{item.targetKey || '本地库'}</span>
                   <div style={{ color: '#57606a', fontSize: '11px', wordBreak: 'break-all' }}>{item.target}</div>
                 </div>
                 <span className={`badge badge-${item.kind === 'skip' ? 'identical' : item.kind === 'modify' ? 'changed' : item.kind}`}>
-                  {item.kind}
+                  {kindLabels[item.kind] || item.kind}
                 </span>
               </div>
             ))}
@@ -132,14 +139,14 @@ export function PlanConfirmDialog({
 
         <div className="modal-footer">
           <button className="button" onClick={onCancel} disabled={isSubmitting}>
-            Cancel
+            取消
           </button>
           <button
             className="button button-primary"
             onClick={onConfirm}
             disabled={isSubmitting || (summary.create === 0 && summary.modify === 0)}
           >
-            {isSubmitting ? 'Applying...' : 'Apply Sync'}
+            {isSubmitting ? '正在应用...' : '应用同步'}
           </button>
         </div>
       </div>

@@ -10,6 +10,7 @@ import { scanRouter } from './routes/scan.js'
 import { skillsRouter } from './routes/skills.js'
 import { syncRouter } from './routes/sync.js'
 import { watchRouter } from './routes/watch.js'
+import { errorHandler } from './middleware/errors.js'
 
 export function createApp(): express.Express {
   const app = express()
@@ -26,6 +27,8 @@ export function createApp(): express.Express {
   app.use('/api/restore', restoreRouter())
   app.use('/api/watch', watchRouter())
   app.use('/api/projects', projectsRouter())
+
+  app.use(errorHandler)
 
   return app
 }

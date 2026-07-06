@@ -24,19 +24,19 @@ export function ImportPage() {
       if (res.skipped) {
         setFeedback({
           type: 'success',
-          message: `[Skip] Skill "${res.skill.name}" was skipped because an identical checksum matches.`
+          message: `[跳过] 由于已存在相同校验和的 Skill，跳过导入 "${res.skill.name}"。`
         })
       } else {
         setFeedback({
           type: 'success',
-          message: `[Success] Skill "${res.skill.name}" (v${res.skill.version}) imported successfully to local library!`
+          message: `[成功] Skill "${res.skill.name}" (v${res.skill.version}) 已成功导入到本地库！`
         })
       }
       setSourcePath('')
     } catch (err) {
       setFeedback({
         type: 'error',
-        message: `Import failed: ${(err as Error).message}`
+        message: `导入失败: ${(err as Error).message}`
       })
     } finally {
       setIsSubmitting(false)
@@ -45,19 +45,19 @@ export function ImportPage() {
 
   return (
     <section className="page" style={{ maxWidth: '600px', margin: '0 auto' }}>
-      <h2>Import Skill to Local Library</h2>
+      <h2>导入 Skill 到本地库</h2>
       <p style={{ color: '#57606a', fontSize: '14px', marginBottom: '24px' }}>
-        Provide the absolute directory path of the skill you want to import. The manager will validate the frontmatter in its SKILL.md before writing it to the local library.
+        请输入您想导入的 Skill 的绝对目录路径。管理器将在写入本地库前校验其 SKILL.md 中的 Frontmatter 元数据。
       </p>
 
       <form onSubmit={handleSubmit} style={{ background: '#ffffff', border: '1px solid #d8dee9', borderRadius: '8px', padding: '24px' }}>
         <div className="form-group">
-          <label htmlFor="path">Source Directory Path (Absolute)</label>
+          <label htmlFor="path">源目录路径 (绝对路径)</label>
           <input
             id="path"
             type="text"
             className="form-input"
-            placeholder="e.g. C:\users\dev\my-new-skill"
+            placeholder="例如：C:\users\dev\my-new-skill"
             value={sourcePath}
             onChange={(e) => setSourcePath(e.target.value)}
             disabled={isSubmitting}
@@ -73,7 +73,7 @@ export function ImportPage() {
               onChange={(e) => setForce(e.target.checked)}
               disabled={isSubmitting}
             />
-            <span>Force Overwrite (Creates registry/local backup before overwriting)</span>
+            <span>强制覆写 (覆盖前会创建注册表与本地备份)</span>
           </label>
 
           <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', margin: 0, fontWeight: 500 }}>
@@ -83,7 +83,7 @@ export function ImportPage() {
               onChange={(e) => setSkip(e.target.checked)}
               disabled={isSubmitting}
             />
-            <span>Skip if identical checksum matches</span>
+            <span>如果校验和一致则跳过</span>
           </label>
         </div>
 
@@ -109,7 +109,7 @@ export function ImportPage() {
             className="button button-primary"
             disabled={isSubmitting || !sourcePath.trim()}
           >
-            {isSubmitting ? 'Importing...' : 'Import Skill'}
+            {isSubmitting ? '正在导入...' : '导入 Skill'}
           </button>
         </div>
       </form>

@@ -1,9 +1,10 @@
 import { Router } from 'express'
 import { importSkill } from '../../core/import.js'
+import { AppError } from '../../utils/errors.js'
 
 export function importRouter(): Router {
   const router = Router()
-  
+
   router.post('/', async (req, res, next) => {
     try {
       const sourcePath = String(req.body.path || '')
@@ -11,8 +12,7 @@ export function importRouter(): Router {
       const skip = !!req.body.skip
 
       if (!sourcePath) {
-        res.status(400).json({ error: 'Missing path parameter' })
-        return
+        throw new AppError('VALIDATION_ERROR', 'Missing path parameter')
       }
 
       const result = await importSkill(sourcePath, { force, skip })

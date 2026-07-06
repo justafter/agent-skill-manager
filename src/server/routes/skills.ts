@@ -20,7 +20,7 @@ export function skillsRouter(): Router {
         (agent) => config.targets[agent]?.enabled
       )
 
-      const untracked: Record<TargetKey, string[]> = {} as any
+      const untracked: Record<TargetKey, { name: string; path: string }[]> = {} as any
       const skillsMap = new Map<string, any>(skills.map(s => [s.name, { ...s, targets: {} }]))
 
       for (const agent of enabledAgents) {
@@ -39,9 +39,9 @@ export function skillsRouter(): Router {
             skillObj.targets[targetKey] = identifySkillState(skillObj, targetSkillInfo)
           }
 
-          untracked[targetKey] = Object.keys(targetSkills).filter(
-            (name) => !registry.skills[name]
-          )
+          untracked[targetKey] = Object.values(targetSkills)
+            .filter((t) => !registry.skills[t.name])
+            .map((t) => ({ name: t.name, path: t.localPath }))
         } else {
           for (const [name, skillObj] of skillsMap.entries()) {
             skillObj.targets[targetKey] = 'missing'
