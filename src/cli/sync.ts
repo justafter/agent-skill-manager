@@ -6,22 +6,26 @@ export function registerSyncCommand(program: Command): void {
   program
     .command('sync')
     .argument('<skill-name>', 'Skill name')
-    .option('--to <targets>', 'Comma-separated target keys, e.g. claude:user,codex:user (required)')
+    .option('--to <targets>', 'Comma-separated target keys, e.g. claude:user,codex:user')
+    .option('--from <source>', 'Source target key to sync from, e.g. claude:user')
     .option('--dry-run', 'Generate and show plan without executing', true)
     .option('--allow-managed-modify', 'Allow overwriting managed targets that have changed')
-    .description('Sync a local skill to target agents')
-    .action(async (skillName: string, options: { to: string; dryRun: boolean; allowManagedModify?: boolean }) => {
+    .description('Sync a local skill to/from target agents')
+    .action(async (skillName: string, options: { to?: string; from?: string; dryRun: boolean; allowManagedModify?: boolean }) => {
       try {
-        if (!options.to) {
-          console.error('Error: --to option is required (e.g. --to claude:user,codex:user).')
+        if (!options.to && !options.from) {
+          console.error('Error: Either --to or --from option must be specified (e.g. --to claude:user or --from claude:user).')
           process.exit(1)
         }
 
-        const targetKeys = options.to.split(',').map((t) => t.trim()) as TargetKey[]
+        const targetKeys = options.to
+          ? (options.to.split(',').map((t) => t.trim()) as TargetKey[])
+          : undefined
         const dryRun = options.dryRun !== false
 
         const planResult = await planSync(skillName, targetKeys, {
-          allowManagedModify: options.allowManagedModify
+          allowManagedModify: options.allowManagedModify,
+          from: options.from as TargetKey | undefined
         })
 
         console.log(`\n=== Sync Plan [${planResult.plan.planId}] ===`)

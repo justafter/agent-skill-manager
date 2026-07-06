@@ -10,6 +10,7 @@ export function syncRouter(): Router {
     try {
       const skillName = String(req.body.skillName || '')
       const targets = req.body.targets as TargetKey[] | undefined
+      const from = req.body.from as TargetKey | undefined
       const allowManagedModify = !!req.body.allowManagedModify
 
       if (!skillName) {
@@ -17,7 +18,7 @@ export function syncRouter(): Router {
         return
       }
 
-      const result = await planSync(skillName, targets, { allowManagedModify })
+      const result = await planSync(skillName, targets, { allowManagedModify, from }, process.cwd())
       res.json(result)
     } catch (error) {
       next(error)
@@ -34,7 +35,7 @@ export function syncRouter(): Router {
         return
       }
 
-      const result = await applySyncPlan(planId, { allowManagedModify })
+      const result = await applySyncPlan(planId, { allowManagedModify }, process.cwd())
       res.json(result)
     } catch (error) {
       next(error)
