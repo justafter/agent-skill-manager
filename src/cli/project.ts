@@ -6,6 +6,8 @@ import { planProjectSkillInject, applyProjectSkillInject } from '../projects/inj
 import { scanProject } from '../projects/scanner.js'
 import { pathExists } from '../utils/fs.js'
 import type { AgentId } from '../types/adapter.js'
+import { planRuleSync } from '../rules/plan.js'
+import { applyRuleSync } from '../rules/apply.js'
 
 export function registerProjectCommand(program: Command): void {
   const project = program.command('project').description('Manage project workspaces')
@@ -67,15 +69,19 @@ export function registerProjectCommand(program: Command): void {
 
         // Detect enabled agents based on folder structures
         const detectedAgents: AgentId[] = []
+        // Note: gemini shares `.agents` with codex at the project level,
+        // so we dedupe via a Set keyed on the detected folder.
         const agentsToCheck: { agent: AgentId; folder: string }[] = [
           { agent: 'claude', folder: '.claude' },
           { agent: 'codex', folder: '.agents' },
-          { agent: 'gemini', folder: '.gemini' }
+          { agent: 'gemini', folder: '.agents' }
         ]
-
+        const detectedFolders = new Set<string>()
         for (const check of agentsToCheck) {
+          if (detectedFolders.has(check.folder)) continue
           if (await pathExists(path.join(absPath, check.folder))) {
             detectedAgents.push(check.agent)
+            detectedFolders.add(check.folder)
           }
         }
 
@@ -209,6 +215,111 @@ export function registerProjectCommand(program: Command): void {
         }
       } catch (error) {
         console.error('Project injection failed:', (error as Error).message)
+        process.exit(1)
+      }
+    })
+
+  // 5. asm project plan-rules <project-id> --agent <agent>
+  project
+    .command('plan-rules')
+    .argument('<project-id>', 'Project ID')
+    .requiredOption('--agent <agent>', 'Agent name, e.g. claude, codex, gemini')
+    .description('Show rule template differences for a project')
+    .action(async (projectId: string, options: { agent: string }) => {
+      try {
+        const config = await loadConfig()
+        const p = config.projects.find((proj) => proj.id === projectId)
+        if (!p) {
+          console.error(`Error: Project not found: ${projectId}`)
+          process.exit(1)
+        }
+
+        const agent = options.agent as AgentId
+        if (!['claude', 'codex', 'gemini'].includes(agent)) {
+          console.error(`Error: Invalid agent: ${agent}. Supported: claude, codex, gemini`)
+          process.exit(1)
+        }
+
+        const plan = await planRuleSync(p, agent)
+        console.log(`\n=== Rule Sync Plan [${p.name}] ===`)
+        console.log(`Target path:  ${plan.targetPath}`)
+        console.log(`Status:       ${plan.status}`)
+        console.log(`Patch Diff:`)
+        console.log(plan.patch || '(No difference)')
+      } catch (error) {
+        console.error('Plan rules failed:', (error as Error).message)
+        process.exit(1)
+      }
+    })
+
+  // 6. asm project push-rules <project-id> --agent <agent> [--mode block|overwrite]
+  project
+    .command('push-rules')
+    .argument('<project-id>', 'Project ID')
+    .requiredOption('--agent <agent>', 'Agent name, e.g. claude, codex, gemini')
+    .option('--mode <mode>', 'Sync mode: block, overwrite', 'block')
+    .description('Push rules template to project rules file')
+    .action(async (projectId: string, options: { agent: string; mode: string }) => {
+      try {
+        const config = await loadConfig()
+        const p = config.projects.find((proj) => proj.id === projectId)
+        if (!p) {
+          console.error(`Error: Project not found: ${projectId}`)
+          process.exit(1)
+        }
+
+        const agent = options.agent as AgentId
+        if (!['claude', 'codex', 'gemini'].includes(agent)) {
+          console.error(`Error: Invalid agent: ${agent}. Supported: claude, codex, gemini`)
+          process.exit(1)
+        }
+
+        const mode = options.mode as 'block' | 'overwrite'
+        if (!['block', 'overwrite'].includes(mode)) {
+          console.error(`Error: Invalid mode: ${mode}. Supported: block, overwrite`)
+          process.exit(1)
+        }
+
+        // Generate plan to check for conflict
+        const plan = await planRuleSync(p, agent)
+        if (plan.status === 'conflict' && mode === 'block') {
+          console.error(`Error: Target file exists but has no managed block. Please specify --mode overwrite to overwrite it.`)
+          process.exit(1)
+        }
+
+        await applyRuleSync(projectId, agent, mode)
+        console.log(`[+] Rules template pushed successfully to ${p.name} using mode: ${mode}`)
+      } catch (error) {
+        console.error('Push rules failed:', (error as Error).message)
+        process.exit(1)
+      }
+    })
+
+  // 7. asm project pull-rules <project-id> --agent <agent>
+  project
+    .command('pull-rules')
+    .argument('<project-id>', 'Project ID')
+    .requiredOption('--agent <agent>', 'Agent name, e.g. claude, codex, gemini')
+    .description('Pull project rules and save as local template')
+    .action(async (projectId: string, options: { agent: string }) => {
+      try {
+        const config = await loadConfig()
+        const p = config.projects.find((proj) => proj.id === projectId)
+        if (!p) {
+          console.error(`Error: Project not found: ${projectId}`)
+          process.exit(1)
+        }
+
+        const agent = options.agent as AgentId
+        if (!['claude', 'codex', 'gemini'].includes(agent)) {
+          console.error(`Error: Invalid agent: ${agent}. Supported: claude, codex, gemini`)
+          process.exit(1)
+        }
+
+        await applyRuleSync(projectId, agent, 'pull')
+        console.log(`[+] Rules pulled successfully from ${p.name} to local ${agent} template.`)
+      } catch (error) {
+        console.error('Pull rules failed:', (error as Error).message)
         process.exit(1)
       }
     })

@@ -9,7 +9,10 @@ export interface ProjectScanResult {
 }
 
 export async function scanProject(project: Project): Promise<ProjectScanResult> {
-  const skillDirs = ['.claude/skills', '.agents/skills', '.gemini/skills']
+  // Note: gemini shares `.agents/skills` with codex at the project level,
+  // so we list each path once — the absolute-path Set in `existing()`
+  // naturally dedupes since both codex and gemini point at the same string.
+  const skillDirs = ['.claude/skills', '.agents/skills']
   const ruleFiles = ['CLAUDE.md', 'AGENTS.md', 'GEMINI.md']
 
   return {

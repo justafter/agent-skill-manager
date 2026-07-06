@@ -7,6 +7,8 @@ import { planProjectSkillInject, applyProjectSkillInject } from '../../projects/
 import { pathExists } from '../../utils/fs.js'
 import type { AgentId } from '../../types/adapter.js'
 import { AppError } from '../../utils/errors.js'
+import { planRuleSync } from '../../rules/plan.js'
+import { applyRuleSync } from '../../rules/apply.js'
 
 export function projectsRouter(): Router {
   const router = Router()
@@ -64,15 +66,19 @@ export function projectsRouter(): Router {
 
       // Detect agent directories
       const detectedAgents: AgentId[] = []
+      // Note: gemini shares `.agents` with codex at the project level,
+      // so we dedupe via a Set keyed on the detected folder.
       const agentsToCheck: { agent: AgentId; folder: string }[] = [
         { agent: 'claude', folder: '.claude' },
         { agent: 'codex', folder: '.agents' },
-        { agent: 'gemini', folder: '.gemini' }
+        { agent: 'gemini', folder: '.agents' }
       ]
-
+      const detectedFolders = new Set<string>()
       for (const check of agentsToCheck) {
+        if (detectedFolders.has(check.folder)) continue
         if (await pathExists(path.join(absPath, check.folder))) {
           detectedAgents.push(check.agent)
+          detectedFolders.add(check.folder)
         }
       }
 
@@ -143,6 +149,46 @@ export function projectsRouter(): Router {
       })
 
       res.json(applyResult)
+    } catch (error) {
+      next(error)
+    }
+  })
+
+  // 5. GET /api/projects/:id/rules/diff - Generate rules template diff
+  router.get('/:id/rules/diff', async (req, res, next) => {
+    try {
+      const { id } = req.params
+      const { agent } = req.query
+
+      if (!agent) {
+        throw new AppError('VALIDATION_ERROR', 'agent parameter is required.')
+      }
+
+      const config = await loadConfig()
+      const p = config.projects.find((proj) => proj.id === id)
+      if (!p) {
+        throw new AppError('NOT_FOUND', `Project not found: ${id}`)
+      }
+
+      const planResult = await planRuleSync(p, agent as AgentId)
+      res.json(planResult)
+    } catch (error) {
+      next(error)
+    }
+  })
+
+  // 6. POST /api/projects/:id/rules/sync - Synchronize rules
+  router.post('/:id/rules/sync', async (req, res, next) => {
+    try {
+      const { id } = req.params
+      const { agent, mode } = req.body
+
+      if (!agent || !mode) {
+        throw new AppError('VALIDATION_ERROR', 'agent and mode are required.')
+      }
+
+      await applyRuleSync(id, agent as AgentId, mode as any)
+      res.json({ success: true })
     } catch (error) {
       next(error)
     }

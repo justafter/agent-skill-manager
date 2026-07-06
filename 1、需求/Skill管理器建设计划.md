@@ -233,8 +233,8 @@ D:\AgentSkillManager
     },
     "gemini": {
       "enabled": true,
-      "userSkillPath": "C:\\Users\\justafter\\.gemini\\antigravity-ide\\plugins\\justafter-skill-manager\\skills",
-      "projectSkillPath": ".gemini\\skills",
+      "userSkillPath": "C:\\Users\\justafter\\.gemini\\config\\skills",
+      "projectSkillPath": ".agents\\skills",
       "projectRuleFile": "GEMINI.md"
     }
   },
@@ -469,8 +469,7 @@ applyRuleUpdate(project, template)
 注册后，管理器会扫描项目内是否已有以下内容：
 
 - `.claude/skills`
-- `.agents/skills`
-- `.gemini/skills`
+- `.agents/skills`（Antigravity 也复用此目录）
 - `CLAUDE.md`
 - `AGENTS.md`
 - `GEMINI.md`
@@ -742,19 +741,19 @@ Codex 项目规则文件：
 Gemini / Antigravity 用户级：
 
 ```text
-%USERPROFILE%\.gemini\antigravity-ide\plugins\justafter-skill-manager\skills\<skill-name>
+%USERPROFILE%\.gemini\config\skills\<skill-name>
+```
+
+Gemini 项目级（与 Codex 共享 `.agents/skills`）：
+
+```text
+<project>\.agents\skills\<skill-name>
 ```
 
 Gemini 项目规则文件：
 
 ```text
 <project>\GEMINI.md
-```
-
-Antigravity 用户级同时生成：
-
-```text
-%USERPROFILE%\.gemini\antigravity-ide\plugins\justafter-skill-manager\plugin.json
 ```
 
 ## 验证计划

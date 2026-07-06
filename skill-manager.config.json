@@ -21,8 +21,8 @@
     },
     "gemini": {
       "enabled": true,
-      "userSkillPath": "%USERPROFILE%/.gemini/antigravity-ide/plugins/justafter-skill-manager/skills",
-      "projectSkillPath": ".gemini/skills",
+      "userSkillPath": "%USERPROFILE%/.gemini/config/skills",
+      "projectSkillPath": ".agents/skills",
       "projectRuleFile": "GEMINI.md"
     }
   },

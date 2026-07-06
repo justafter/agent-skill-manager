@@ -97,7 +97,7 @@ SkillMeta { name, version, description, localPath, checksum, lastModified, resou
 | --- | --- | --- | --- |
 | `ClaudeAdapter` | `%USERPROFILE%\.claude\skills\` | `<project>\.claude\skills\` | `<project>\CLAUDE.md` |
 | `CodexAdapter` | `%USERPROFILE%\.agents\skills\` | `<project>\.agents\skills\` | `<project>\AGENTS.md` |
-| `GeminiAntigravityAdapter` | `%USERPROFILE%\.gemini\antigravity-ide\plugins\justafter-skill-manager\skills\` | `<project>\.gemini\skills\` | `<project>\GEMINI.md` |
+| `GeminiAntigravityAdapter` | `%USERPROFILE%\.gemini\config\skills\` | `<project>\.agents\skills\`（与 Codex 共享） | `<project>\GEMINI.md` |
 
 **统一接口（Adapter contract）**：
 
@@ -220,7 +220,7 @@ applyRuleUpdate(...)      → RuleApplyResult         // 规则写入结果
   "targets": {
     "claude": { "enabled": true, "userSkillPath": "...", "projectSkillPath": ".claude\\skills", "projectRuleFile": "CLAUDE.md" },
     "codex":  { "enabled": true, "userSkillPath": "...", "projectSkillPath": ".agents\\skills", "projectRuleFile": "AGENTS.md" },
-    "gemini": { "enabled": true, "userSkillPath": "...", "projectSkillPath": ".gemini\\skills", "projectRuleFile": "GEMINI.md" }
+    "gemini": { "enabled": true, "userSkillPath": "...", "projectSkillPath": ".agents\\skills", "projectRuleFile": "GEMINI.md" }
   },
   "projects": [
     { "id": "obsidian-notes", "name": "Obsidian笔记", "path": "D:\\Obsidian笔记", "enabledAgents": ["claude", "codex"] }
