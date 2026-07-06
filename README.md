@@ -8,3 +8,10 @@
 - [项目架构](./2、架构/ARCHITECTURE.md)
 - [技术架构](./2、架构/技术架构.md)
 - [项目目录](./3、详细设计/项目目录.md)
+- [Agent 协作规范](./.agents/AGENT_COLLABORATION.md)
+
+## Agent 项目规则
+
+- [Claude Code 规则](./CLAUDE.md)
+- [Codex 规则](./AGENTS.md)
+- [Gemini / Antigravity 规则](./GEMINI.md)

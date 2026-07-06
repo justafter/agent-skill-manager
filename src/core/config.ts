@@ -2,6 +2,9 @@ import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { z } from 'zod'
 import type { ResolvedConfig } from '../types/config.js'
+import { expandUserProfile } from '../utils/paths.js'
+import { pathExists, atomicWriteJson } from '../utils/fs.js'
+import { AppError } from '../utils/errors.js'
 
 const targetSchema = z.object({
   enabled: z.boolean(),
@@ -35,10 +38,93 @@ const configSchema = z.object({
   )
 })
 
+export function getUserConfigPath(): string {
+  return expandUserProfile('%USERPROFILE%/.skill-manager.config.json')
+}
+
+export function deepMerge(target: any, source: any): any {
+  if (typeof target !== 'object' || target === null || typeof source !== 'object' || source === null) {
+    return source !== undefined ? source : target
+  }
+
+  const result = { ...target }
+  for (const key of Object.keys(source)) {
+    if (source[key] === undefined) continue
+    if (Array.isArray(target[key]) || Array.isArray(source[key])) {
+      result[key] = source[key]
+    } else if (typeof target[key] === 'object' && target[key] !== null && typeof source[key] === 'object' && source[key] !== null) {
+      result[key] = deepMerge(target[key], source[key])
+    } else {
+      result[key] = source[key]
+    }
+  }
+  return result
+}
+
 export async function loadConfig(root = process.cwd()): Promise<ResolvedConfig> {
-  const raw = await readFile(path.join(root, 'skill-manager.config.json'), 'utf8')
-  const parsed = configSchema.parse(JSON.parse(raw))
-  return resolveConfigPaths(root, parsed)
+  const defaultPath = path.join(root, 'skill-manager.config.json')
+  let defaultJson: any = {}
+  try {
+    const raw = await readFile(defaultPath, 'utf8')
+    defaultJson = JSON.parse(raw)
+  } catch (error) {
+    throw new AppError(
+      'CONFIG_LOAD_FAILED',
+      `Default configuration file not found at ${defaultPath}`,
+      { defaultPath, originalError: error }
+    )
+  }
+
+  const userPath = getUserConfigPath()
+  let userJson: any = {}
+  if (await pathExists(userPath)) {
+    try {
+      const raw = await readFile(userPath, 'utf8')
+      userJson = JSON.parse(raw)
+    } catch (error) {
+      throw new AppError(
+        'CONFIG_PARSE_ERROR',
+        `Failed to parse user configuration at ${userPath}: ${(error as Error).message}`,
+        { userPath, originalError: error }
+      )
+    }
+  }
+
+  const merged = deepMerge(defaultJson, userJson)
+  try {
+    const parsed = configSchema.parse(merged)
+    return resolveConfigPaths(root, parsed)
+  } catch (error) {
+    throw new AppError(
+      'CONFIG_VALIDATION_FAILED',
+      `Configuration validation failed: ${(error as Error).message}`,
+      { merged, originalError: error }
+    )
+  }
+}
+
+export async function saveConfig(userConfigUpdates: Partial<ResolvedConfig>): Promise<void> {
+  const userPath = getUserConfigPath()
+  let existingUserConfig: any = {}
+  if (await pathExists(userPath)) {
+    try {
+      const raw = await readFile(userPath, 'utf8')
+      existingUserConfig = JSON.parse(raw)
+    } catch {
+      existingUserConfig = {}
+    }
+  }
+
+  const updatedUserConfig = deepMerge(existingUserConfig, userConfigUpdates)
+  try {
+    await atomicWriteJson(userPath, updatedUserConfig)
+  } catch (error) {
+    throw new AppError(
+      'CONFIG_SAVE_FAILED',
+      `Failed to save user configuration: ${(error as Error).message}`,
+      { userPath, originalError: error }
+    )
+  }
 }
 
 function resolveConfigPaths(root: string, config: ResolvedConfig): ResolvedConfig {
@@ -65,6 +151,6 @@ function resolveConfigPaths(root: string, config: ResolvedConfig): ResolvedConfi
 
 function resolveTokenPath(root: string, value: string): string {
   if (!value) return value
-  const expanded = value.replace('%USERPROFILE%', process.env.USERPROFILE ?? '')
+  const expanded = expandUserProfile(value)
   return path.isAbsolute(expanded) ? expanded : path.resolve(root, expanded)
 }

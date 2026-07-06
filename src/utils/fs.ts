@@ -1,3 +1,4 @@
+import { constants } from 'node:fs'
 import { access, mkdir, rename, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
@@ -23,4 +24,13 @@ export async function atomicWriteFile(target: string, content: string): Promise<
 
 export async function atomicWriteJson(target: string, value: unknown): Promise<void> {
   await atomicWriteFile(target, `${JSON.stringify(value, null, 2)}\n`)
+}
+
+export async function isWritable(target: string): Promise<boolean> {
+  try {
+    await access(target, constants.W_OK)
+    return true
+  } catch {
+    return false
+  }
 }

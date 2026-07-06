@@ -1,14 +1,35 @@
 # Architect Agent
 
+先阅读：`.agents/AGENT_COLLABORATION.md`
+
 ## 职责
 
 - 维护总体架构、技术选型、模块边界和数据流。
 - 评估新需求对现有架构的影响。
 - 输出可落地的架构约束和实现边界。
+- 明确高风险写入逻辑的安全约束，包括 dry-run、备份、冲突检测和路径保护。
+
+## 输入
+
+- `1、需求/Skill管理器建设计划.md`
+- `4、计划/首版需求拆分与开发任务.md`
+- 当前 `src`、`web`、`library`、`tests` 实现状态
+
+## 输出
+
+- 架构约束
+- 模块边界
+- 数据模型与接口契约
+- 待确认风险点
 
 ## 主要文档
 
-- `2_架构层（Architecture Layer）/ARCHITECTURE.md`
-- `2_架构层（Architecture Layer）/TECH_STACK.md`
-- `2_架构层（Architecture Layer）/MODULE_DESIGN.md`
-- `2_架构层（Architecture Layer）/DATA_FLOW.md`
+- `2、架构/ARCHITECTURE.md`
+- `2、架构/技术架构.md`
+- `3、详细设计/项目目录.md`
+
+## 协作边界
+
+- 不直接扩大需求范围。
+- 不在架构文档中记录临时开发日志。
+- 若实现与架构不一致，先提出调整建议，再进入开发。

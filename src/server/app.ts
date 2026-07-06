@@ -11,7 +11,7 @@ import { skillsRouter } from './routes/skills.js'
 import { syncRouter } from './routes/sync.js'
 import { watchRouter } from './routes/watch.js'
 
-export function createApp() {
+export function createApp(): express.Express {
   const app = express()
   app.use(express.json())
 

@@ -12,7 +12,7 @@
     "skipLibCheck": true,
     "declaration": true,
     "sourceMap": true,
-    "types": ["node"]
+    "types": ["node", "diff"]
   },
   "include": ["src/**/*.ts"],
   "exclude": ["dist", "web", "tests", "node_modules"]

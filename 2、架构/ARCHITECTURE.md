@@ -7,7 +7,7 @@
 
 Skill 管理器是一个**本地优先**的 Agent Skills 统一管理工具，承担三个核心角色：
 
-1. **Skill 库管理员**：作为本机统一的 Skill 源（`library/skills`），收纳、校验、注册所有 Agent Skills。
+1. **Skill 库管理员**：作为首版同步写入的 canonical source（`library/skills`），收纳、校验、注册所有 Agent Skills，并保留外部开发目录 `localPath` 用于溯源和后续 Watch Mode。
 2. **多 Agent 同步引擎**：把本地 Skill 推送到 Claude Code / Codex / Gemini-Antigravity 等目标 Agent 的用户级与项目级目录。
 3. **项目规则同步器**：管理 `CLAUDE.md` / `AGENTS.md` / `GEMINI.md` 等项目级 Agent 规则文件，支持托管块更新、模板拉取。
 
@@ -115,7 +115,7 @@ applyRuleUpdate(...)      → RuleApplyResult         // 规则写入结果
 
 ### 3.3 项目工作区
 
-管理"按项目注入"这一关键能力。注册信息存于用户级配置 `~/.skill-manager/config.json` 的 `projects[]`：
+管理"按项目注入"这一关键能力。注册信息存于用户级配置 `~/.skill-manager/config.json`（Windows 等价于 `%USERPROFILE%\.skill-manager\config.json`）的 `projects[]`：
 
 ```jsonc
 {
@@ -210,7 +210,7 @@ applyRuleUpdate(...)      → RuleApplyResult         // 规则写入结果
 
 ### 4.1 用户级配置 `~/.skill-manager/config.json`
 
-运行时配置由仓库根 `skill-manager.config.json` 的默认值与用户级配置合并生成；下面示例展示合并后的结构。
+运行时配置由仓库根 `skill-manager.config.json` 的默认值与用户级配置合并生成；Windows 下等价路径为 `%USERPROFILE%\.skill-manager\config.json`。下面示例展示合并后的结构。
 
 ```json
 {
@@ -272,9 +272,10 @@ applyRuleUpdate(...)      → RuleApplyResult         // 规则写入结果
    │
    ▼
 1) core/validation.parseSkillDir(localPath)
-2) 校验通过 → 计算 checksum
-3) registry.json 写入条目
-4) 返回 SkillMeta 给 CLI/UI
+2) 校验通过 → 复制到 library/skills/<skill-name>
+3) 对 library/skills/<skill-name> 计算 checksum
+4) registry.json 写入条目，并保留原始 localPath
+5) 返回 SkillMeta 给 CLI/UI
 ```
 
 ### 5.2 同步到目标
@@ -322,7 +323,7 @@ applyRuleUpdate(...)      → RuleApplyResult         // 规则写入结果
 用户: asm scan
    │
    ▼
-1) 扫描 devDir（本地开发目录）
+1) 扫描 devDir（本地开发目录）和 registry.localPath（已导入 Skill 的原始目录）
 2) 扫描 registry 中所有 target 的 installed 状态（含 checksum + lastModified）
 3) 扫描注册项目中的项目级 Skill
 4) 对每个 Skill 比对所有端点：
@@ -334,6 +335,7 @@ applyRuleUpdate(...)      → RuleApplyResult         // 规则写入结果
 ## 6. 安全与边界
 
 - **写入范围限制**：项目级写入只允许 `project.path` 内部；目标端写入只允许 `config.targets[*].userSkillPath` / `projectSkillPath` 内部。
+- **白名单最小化**：Path Guard 只允许 `library/skills`、`library/registry.json`、`backups`、`ruleTemplateDir`、已注册项目和已启用适配器目录，不允许把整个仓库根目录当作通用写入根。
 - **冲突处理**：目标端存在但无管理标记 → 不覆盖，必须显式 confirm。
 - **Plan / Apply 分离**：所有写接口的 `apply` 必须携带 `planId`，确保执行内容与展示一致。
 - **dry-run 强制**：M1 之后任何写接口默认 `dryRun: true`，用户必须显式确认。

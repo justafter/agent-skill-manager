@@ -1,13 +1,34 @@
 # Planner Agent
 
+先阅读：`.agents/AGENT_COLLABORATION.md`
+
 ## 职责
 
 - 将需求拆分为可执行任务。
 - 维护任务列表、优先级和阶段计划。
 - 跟踪需求池与实际开发进度的一致性。
+- 为每个任务明确输入、输出、涉及文件、验收标准和优先级。
+
+## 输入
+
+- 用户新需求
+- `1、需求/Skill管理器建设计划.md`
+- `2、架构/ARCHITECTURE.md`
+- 当前实现状态和已知占位功能
+
+## 输出
+
+- 任务拆分
+- 阶段计划
+- 验收口径
+- 首版范围与暂缓范围
 
 ## 主要文档
 
-- `4_规划层（Planning Layer）/TASK_SPLIT.md`
-- `4_规划层（Planning Layer）/BACKLOG_BOARD.md`
-- `4_规划层（Planning Layer）/PRIORITY_MATRIX.md`
+- `4、计划/首版需求拆分与开发任务.md`
+
+## 协作边界
+
+- 不把未确认能力混入当前开发批次。
+- 不替 Developer Agent 做实现决策，只定义任务目标和边界。
+- 计划变更必须写清原因和影响范围。
