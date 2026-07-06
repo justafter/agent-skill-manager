@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, it, before, after } from 'node:test'
-import { mkdtemp, rm, mkdir } from 'node:fs/promises'
+import { mkdtemp, rm, mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import os from 'node:os'
 import { AppError } from '../../src/utils/errors.js'
@@ -95,6 +95,35 @@ describe('D0 Infrastructure', () => {
       assert.equal(config.projects.length, 1)
       assert.equal(config.projects[0].id, 'test-project')
     })
+
+    it('migrates old configuration to the new directory location', async () => {
+      const migrationTempDir = await mkdtemp(path.join(os.tmpdir(), 'asm-migration-test-'))
+      const oldEnvUserProfile = process.env.USERPROFILE
+      const oldEnvHome = process.env.HOME
+      process.env.USERPROFILE = migrationTempDir
+      process.env.HOME = migrationTempDir
+
+      try {
+        const oldUserPath = path.join(migrationTempDir, '.skill-manager.config.json')
+        const mockConfigData = {
+          devDir: '/migration/test/dev/dir',
+          projects: []
+        }
+        await writeFile(oldUserPath, JSON.stringify(mockConfigData, null, 2))
+
+        const config = await loadConfig(process.cwd())
+
+        assert.equal(config.devDir, '/migration/test/dev/dir')
+
+        const newConfigPath = path.join(migrationTempDir, '.skill-manager', 'config.json')
+        assert.ok(await pathExists(newConfigPath))
+        assert.ok(!(await pathExists(oldUserPath)))
+      } finally {
+        process.env.USERPROFILE = oldEnvUserProfile
+        process.env.HOME = oldEnvHome
+        await rm(migrationTempDir, { recursive: true, force: true })
+      }
+    })
   })
 
   describe('Registry Read/Write', () => {
@@ -139,6 +168,7 @@ describe('D0 Infrastructure', () => {
       await mkdir(mockBackupDir, { recursive: true })
 
       const config: ResolvedConfig = {
+        workspaceRoot: tempDir,
         backupDir: mockBackupDir,
         devDir: '',
         ruleTemplateDir: '',
@@ -179,15 +209,20 @@ describe('D0 Infrastructure', () => {
       const safeProjectFile = path.join(mockProjectDir, 'src/index.ts')
       const safeSkillFile = path.join(mockUserSkillDir, 'my-skill/SKILL.md')
       const safeBackupFile = path.join(mockBackupDir, 'backup-1.tar.gz')
+      const safeLibrarySkillFile = path.join(tempDir, 'library', 'skills', 'managed-skill', 'SKILL.md')
+      const safeRegistryFile = path.join(tempDir, 'library', 'registry.json')
 
       // Should not throw
       await assertSafeWritePath(safeProjectFile, config)
       await assertSafeWritePath(safeSkillFile, config)
       await assertSafeWritePath(safeBackupFile, config)
+      await assertSafeWritePath(safeLibrarySkillFile, config)
+      await assertSafeWritePath(safeRegistryFile, config)
 
       // Invalid paths (traversal or outside allowed dirs)
       const unsafeFile = path.join(tempDir, 'secrets.json')
       const traversalFile = path.join(mockProjectDir, '../secrets.json')
+      const unsafeLibraryFile = path.join(tempDir, 'library', 'unexpected.json')
 
       await assert.rejects(
         assertSafeWritePath(unsafeFile, config),
@@ -196,6 +231,11 @@ describe('D0 Infrastructure', () => {
 
       await assert.rejects(
         assertSafeWritePath(traversalFile, config),
+        (err: any) => err instanceof AppError && err.code === 'PATH_OUT_OF_BOUNDS'
+      )
+
+      await assert.rejects(
+        assertSafeWritePath(unsafeLibraryFile, config),
         (err: any) => err instanceof AppError && err.code === 'PATH_OUT_OF_BOUNDS'
       )
     })

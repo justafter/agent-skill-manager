@@ -23,11 +23,17 @@
   3. 比对 `library/registry.json` 现有条目，识别冲突：
      - Checksum 相同：直接返回 status = `skipped`。
      - Checksum 不同且无特定选项：抛出 `AppError` 错误提示重名冲突。
-     - 提供了 `--force` 选项：先备份旧的 `library/skills/<skill-name>` 和 registry snapshot，再执行覆盖写入。
+     - 提供了 `--force` 选项：执行备份与覆盖写入。
      - 提供了 `--skip` 选项：跳过写入并返回。
-  4. 采用安全复制流程把技能文件复制到 `library/skills/<skill-name>` 下：先复制到临时目录，成功后再替换目标目录；避免源目录删除文件后目标端残留旧文件。
-  5. 将技能元数据整合进 `registry.json`，持久化保存。
-  6. registry 中记录的 checksum 必须与 `library/skills/<skill-name>` 的最终内容一致，而不是只记录原始 `localPath` 的解析结果。
+  4. **覆盖前强制备份**：
+     - 若执行覆盖（`--force`），先生成一个随机或时间戳命名的 `backupId`（如 `bk_<timestamp>_<uuid>`）。
+     - 将当前 `library/registry.json` 保存为 `backups/bk_<timestamp>_<uuid>/registry-snapshot.json`。
+     - 将原 `library/skills/<skill-name>` 目录备份复制到 `backups/bk_<timestamp>_<uuid>/library/skills/<skill-name>` 下。
+  5. **安全覆盖写入**：
+     - 先复制到 `library/skills/.<skill-name>.import-<pid>-<timestamp>` 临时目录。
+     - 复制成功后再删除旧目标目录并 `rename` 临时目录为 `library/skills/<skill-name>`，防止复制失败时破坏旧版本。
+     - 替换完成后重新解析 `library/skills/<skill-name>`，以 canonical source 的最终内容计算 checksum、lastModified 和资源目录标记。
+  6. 将技能元数据整合进 `registry.json`（保留并继承已有 `syncedTargets` 与 `projectInstalls` 列表，并保留原始 `localPath`），持久化保存。
 
 ### 1.2 CLI 命令对接
 - 修改 `src/cli/import.ts`，为 `import` 命令绑定 `-f, --force` 和 `-s, --skip` 选项。
@@ -37,7 +43,7 @@
 
 ### 自动化测试
 - 新建集成测试 `tests/integration/import.test.ts` 进行场景验证。
-- 覆盖 force 导入前备份、skip 不写入、重复导入不改变目标、源目录删除文件后目标无旧文件残留。
+- 覆盖 force 导入前备份、skip 不写入、重复导入不改变目标、源目录删除文件后目标无旧文件残留、registry checksum 与 canonical source 一致。
 - 执行 `pnpm run typecheck`。
 - 执行 `pnpm run test`。
 

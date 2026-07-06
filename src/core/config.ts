@@ -1,9 +1,9 @@
-import { readFile } from 'node:fs/promises'
+import { readFile, unlink } from 'node:fs/promises'
 import path from 'node:path'
 import { z } from 'zod'
 import type { ResolvedConfig } from '../types/config.js'
 import { expandUserProfile } from '../utils/paths.js'
-import { pathExists, atomicWriteJson } from '../utils/fs.js'
+import { pathExists, atomicWriteJson, atomicWriteFile } from '../utils/fs.js'
 import { AppError } from '../utils/errors.js'
 
 const targetSchema = z.object({
@@ -39,6 +39,10 @@ const configSchema = z.object({
 })
 
 export function getUserConfigPath(): string {
+  return expandUserProfile('%USERPROFILE%/.skill-manager/config.json')
+}
+
+export function getOldUserConfigPath(): string {
   return expandUserProfile('%USERPROFILE%/.skill-manager.config.json')
 }
 
@@ -76,6 +80,19 @@ export async function loadConfig(root = process.cwd()): Promise<ResolvedConfig> 
   }
 
   const userPath = getUserConfigPath()
+  const oldUserPath = getOldUserConfigPath()
+
+  // Migrate user config if old path exists but new path doesn't
+  if (!(await pathExists(userPath)) && (await pathExists(oldUserPath))) {
+    try {
+      const oldRaw = await readFile(oldUserPath, 'utf8')
+      await atomicWriteFile(userPath, oldRaw)
+      await unlink(oldUserPath).catch(() => {})
+    } catch (migrationError) {
+      // Continue and let it fail or log on parse if it failed to write
+    }
+  }
+
   let userJson: any = {}
   if (await pathExists(userPath)) {
     try {
@@ -93,7 +110,11 @@ export async function loadConfig(root = process.cwd()): Promise<ResolvedConfig> 
   const merged = deepMerge(defaultJson, userJson)
   try {
     const parsed = configSchema.parse(merged)
-    return resolveConfigPaths(root, parsed)
+    const resolved = resolveConfigPaths(root, parsed)
+    return {
+      ...resolved,
+      workspaceRoot: root
+    }
   } catch (error) {
     throw new AppError(
       'CONFIG_VALIDATION_FAILED',

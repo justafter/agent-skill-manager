@@ -22,4 +22,4 @@ export interface AppConfig {
   projects: Project[]
 }
 
-export type ResolvedConfig = AppConfig
+export type ResolvedConfig = AppConfig & { workspaceRoot?: string }
