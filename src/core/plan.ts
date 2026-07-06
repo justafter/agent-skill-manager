@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { Plan, PlanId, PlanItem, PlanResult } from '../types/plan.js'
-import { putPlan } from './state.js'
+import { putPlan, markExecuted } from './state.js'
 
 export interface CreatePlanInput {
   source: string
@@ -33,4 +33,8 @@ export function summarizePlanItems(items: PlanItem[]): PlanResult['summary'] {
     conflict: items.filter((item) => item.kind === 'conflict').length,
     delete: items.filter((item) => item.kind === 'delete').length
   }
+}
+
+export function markPlanExecuted(planId: PlanId, appliedItems: PlanItem[]): void {
+  markExecuted(planId, appliedItems)
 }

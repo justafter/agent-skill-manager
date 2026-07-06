@@ -3,5 +3,7 @@ export type {
   AdapterTargetPaths,
   AgentId,
   Scope,
-  TargetKey
+  TargetKey,
+  TargetSkillInfo,
+  DeployTag
 } from '../types/adapter.js'

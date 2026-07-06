@@ -9,6 +9,9 @@ export interface BackupItem {
   skillName?: string
   originalPath: string
   backupPath: string
+  targetType?: 'user' | 'project'
+  targetAgent?: string
+  targetSkillPath?: string
 }
 
 export interface BackupIndex {

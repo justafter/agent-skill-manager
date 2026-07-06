@@ -8,8 +8,27 @@ export interface AdapterTargetPaths {
   projectRuleFile: string
 }
 
+export interface DeployTag {
+  managedBy: 'AgentSkillManager'
+  skillName: string
+  sourcePath: string
+  sourceHash: string
+  target: TargetKey
+  projectId?: string
+  deployedAt: string
+}
+
+export interface TargetSkillInfo {
+  name: string
+  localPath: string
+  checksum: `sha256:${string}`
+  deployTag?: DeployTag
+  detected: boolean
+}
+
 export interface Adapter {
   readonly agent: AgentId
   detect(): Promise<boolean>
   getTargetPaths(): AdapterTargetPaths
+  scanUserSkills(): Promise<Record<string, TargetSkillInfo>>
 }
