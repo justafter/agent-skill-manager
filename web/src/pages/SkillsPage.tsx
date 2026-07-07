@@ -50,6 +50,7 @@ export function SkillsPage() {
   const [currentToTarget, setCurrentToTarget] = useState<string | undefined>(undefined)
   const [currentFromTarget, setCurrentFromTarget] = useState<string | undefined>(undefined)
   const [allowManagedModify, setAllowManagedModify] = useState(false)
+  const [allowConflictOverwrite, setAllowConflictOverwrite] = useState(true)
   const [isSubmittingPlan, setIsSubmittingPlan] = useState(false)
   const [planErrorMessage, setPlanErrorMessage] = useState<string | null>(null)
 
@@ -66,7 +67,13 @@ export function SkillsPage() {
     }
   }
 
-  const triggerPlan = async (skillName: string, toTarget?: string, fromTarget?: string, currentModifyVal = false) => {
+  const triggerPlan = async (
+    skillName: string,
+    toTarget?: string,
+    fromTarget?: string,
+    currentModifyVal = false,
+    currentOverwriteVal = allowConflictOverwrite
+  ) => {
     try {
       setIsSubmittingPlan(true)
       setPlanErrorMessage(null)
@@ -81,7 +88,8 @@ export function SkillsPage() {
         skillName,
         targets: !isPull && toTarget ? [toTarget] : undefined,
         from: isPull ? fromTarget : undefined,
-        allowManagedModify: currentModifyVal
+        allowManagedModify: currentModifyVal,
+        allowConflictOverwrite: !isPull ? currentOverwriteVal : false
       }
 
       const res = await apiPost<PlanResult>('/api/sync/plan', body)
@@ -97,7 +105,14 @@ export function SkillsPage() {
   const handleAllowManagedModifyChange = async (val: boolean) => {
     setAllowManagedModify(val)
     if (currentSkill) {
-      await triggerPlan(currentSkill, currentToTarget, currentFromTarget, val)
+      await triggerPlan(currentSkill, currentToTarget, currentFromTarget, val, allowConflictOverwrite)
+    }
+  }
+
+  const handleAllowConflictOverwriteChange = async (val: boolean) => {
+    setAllowConflictOverwrite(val)
+    if (currentSkill) {
+      await triggerPlan(currentSkill, currentToTarget, currentFromTarget, allowManagedModify, val)
     }
   }
 
@@ -108,7 +123,8 @@ export function SkillsPage() {
       setPlanErrorMessage(null)
       await apiPost('/api/sync/apply', {
         planId: planResult.plan.planId,
-        allowManagedModify
+        allowManagedModify,
+        allowConflictOverwrite
       })
       setPlanDialogOpen(false)
       setPlanResult(null)
@@ -506,6 +522,8 @@ export function SkillsPage() {
         planResult={planResult}
         allowManagedModify={allowManagedModify}
         onAllowManagedModifyChange={handleAllowManagedModifyChange}
+        allowConflictOverwrite={allowConflictOverwrite}
+        onAllowConflictOverwriteChange={handleAllowConflictOverwriteChange}
         onConfirm={handleConfirmSync}
         onCancel={() => {
           setPlanDialogOpen(false)

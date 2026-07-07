@@ -9,7 +9,7 @@ export interface BackupItem {
   skillName?: string
   originalPath: string
   backupPath: string
-  targetType?: 'user' | 'project'
+  targetType?: 'user' | 'project' | 'development'
   targetAgent?: string
   targetSkillPath?: string
 }

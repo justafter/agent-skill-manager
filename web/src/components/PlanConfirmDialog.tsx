@@ -26,6 +26,8 @@ export interface PlanConfirmDialogProps {
   planResult: PlanResult | null
   allowManagedModify: boolean
   onAllowManagedModifyChange: (val: boolean) => void
+  allowConflictOverwrite: boolean
+  onAllowConflictOverwriteChange: (val: boolean) => void
   onConfirm: () => void
   onCancel: () => void
   isSubmitting: boolean
@@ -37,6 +39,8 @@ export function PlanConfirmDialog({
   planResult,
   allowManagedModify,
   onAllowManagedModifyChange,
+  allowConflictOverwrite,
+  onAllowConflictOverwriteChange,
   onConfirm,
   onCancel,
   isSubmitting,
@@ -46,6 +50,9 @@ export function PlanConfirmDialog({
 
   const { plan, summary } = planResult
   const hasConflicts = summary.conflict > 0
+  const applicableCount = summary.create + summary.modify
+  const canApply = applicableCount > 0
+  const hasLocalTarget = plan.items.some((item) => item.targetKey === 'local')
 
   const kindLabels: Record<string, string> = {
     create: '新增',
@@ -85,7 +92,18 @@ export function PlanConfirmDialog({
             </span>
           </div>
 
-          <div className="form-group" style={{ background: '#f8fafc', padding: '12px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+          <div className="form-group" style={{ background: '#f8fafc', padding: '12px', borderRadius: '6px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', margin: 0 }}>
+              <input
+                type="checkbox"
+                checked={allowConflictOverwrite}
+                onChange={(e) => onAllowConflictOverwriteChange(e.target.checked)}
+                disabled={isSubmitting}
+              />
+              <span style={{ fontSize: '13px', fontWeight: 500 }}>
+                允许覆盖目标目录中的同名 Skill（包含非托管冲突，覆盖前会备份）
+              </span>
+            </label>
             <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', margin: 0 }}>
               <input
                 type="checkbox"
@@ -101,7 +119,19 @@ export function PlanConfirmDialog({
 
           {hasConflicts && (
             <div className="empty-state" style={{ color: '#da3633', background: '#ffebe9', border: '1px solid #ffc8c4', padding: '12px', marginBottom: '16px', fontSize: '13px' }}>
-              <strong>警告:</strong> 存在未解决的冲突。您必须勾选上面的复选框来授权覆写这些已变更的目录，否则在执行应用时它们将被跳过。
+              <strong>警告:</strong> 存在未解决的冲突。勾选“允许覆盖目标目录中的同名 Skill”并重新生成计划后，冲突目标会转为“修改”，执行时先备份再覆盖。
+            </div>
+          )}
+
+          {hasLocalTarget && (
+            <div className="empty-state" style={{ color: '#7c4a03', background: '#fff8c5', border: '1px solid #f0d98c', padding: '12px', marginBottom: '16px', fontSize: '13px' }}>
+              <strong>提示:</strong> 反向拉取会先覆盖本地库，再覆盖该 Skill 的导入目录（registry.localPath），覆盖前会分别创建备份。
+            </div>
+          )}
+
+          {!canApply && (
+            <div className="empty-state" style={{ color: '#57606a', background: '#f8fafc', border: '1px solid #d0d7de', padding: '12px', marginBottom: '16px', fontSize: '13px' }}>
+              当前计划没有可应用项。请先处理冲突，或重新生成一个包含“新增/修改”的同步计划。
             </div>
           )}
 
@@ -144,9 +174,9 @@ export function PlanConfirmDialog({
           <button
             className="button button-primary"
             onClick={onConfirm}
-            disabled={isSubmitting || (summary.create === 0 && summary.modify === 0)}
+            disabled={isSubmitting || !canApply}
           >
-            {isSubmitting ? '正在应用...' : '应用同步'}
+            {isSubmitting ? '正在应用...' : canApply ? '应用同步' : '无可应用项'}
           </button>
         </div>
       </div>

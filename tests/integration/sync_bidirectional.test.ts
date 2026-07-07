@@ -73,13 +73,17 @@ describe('D3b Bidirectional & Cross-Agent Sync', () => {
   it('pulls from Claude to Local with backup and registry updates', async () => {
     const skillName = 'bidir-skill'
     const localDir = path.join(tempWorkspace, 'library', 'skills', skillName)
+    const developmentDir = path.join(tempWorkspace, 'dev-skills', skillName)
     const claudeSkillDir = path.join(claudeSkillsDir, skillName)
 
     await mkdir(localDir, { recursive: true })
+    await mkdir(developmentDir, { recursive: true })
     await mkdir(claudeSkillDir, { recursive: true })
 
     // Local code
     await writeFile(path.join(localDir, 'SKILL.md'), '---\nname: bidir-skill\nversion: 1.0.0\ndescription: local description\n---\nLocal Code')
+    // Development/import directory starts with the same old version and should be updated by pull.
+    await writeFile(path.join(developmentDir, 'SKILL.md'), '---\nname: bidir-skill\nversion: 1.0.0\ndescription: local description\n---\nDevelopment Code')
     // Claude code has changes and updated version
     await writeFile(path.join(claudeSkillDir, 'SKILL.md'), '---\nname: bidir-skill\nversion: 1.5.0\ndescription: updated description\n---\nClaude Code')
 
@@ -90,7 +94,7 @@ describe('D3b Bidirectional & Cross-Agent Sync', () => {
       version: '1.0.0',
       description: 'local description',
       checksum: 'sha256:local-init-checksum' as any,
-      localPath: localDir,
+      localPath: developmentDir,
       syncedTargets: [],
       projectInstalls: []
     }
@@ -121,11 +125,17 @@ describe('D3b Bidirectional & Cross-Agent Sync', () => {
     assert.ok(localContent.includes('Claude Code'))
     assert.ok(!localContent.includes('Local Code'))
 
+    // Verify development/import directory is also updated.
+    const developmentContent = await readFile(path.join(developmentDir, 'SKILL.md'), 'utf8')
+    assert.ok(developmentContent.includes('Claude Code'))
+    assert.ok(!developmentContent.includes('Development Code'))
+
     // Verify local registry entry updated (version & description re-parsed from updated SKILL.md)
     const updatedRegistry = await loadRegistry(tempWorkspace)
     const updatedSkill = updatedRegistry.skills[skillName]
     assert.equal(updatedSkill.version, '1.5.0')
     assert.equal(updatedSkill.description, 'updated description')
+    assert.equal(updatedSkill.localPath, developmentDir)
     assert.ok(updatedSkill.syncedTargets.includes('claude:user'))
 
     // Verify backup created under backups/bk_*
@@ -137,6 +147,17 @@ describe('D3b Bidirectional & Cross-Agent Sync', () => {
     assert.ok(await pathExists(backupRegistrySnapshot))
     const backupSkillDir = path.join(backupsDir, bkFolder, 'library', 'skills', skillName)
     assert.ok(await pathExists(backupSkillDir))
+
+    const backupIndexes = await Promise.all(
+      backupEntries
+        .filter(e => e.startsWith('bk_'))
+        .map(async e => JSON.parse(await readFile(path.join(backupsDir, e, 'index.json'), 'utf8')))
+    )
+    assert.ok(
+      backupIndexes.some(index =>
+        index.items.some((item: any) => item.targetType === 'development' && item.originalPath === developmentDir)
+      )
+    )
   })
 
   it('performs cross-agent sync (from Claude to Codex via Local)', async () => {
@@ -169,5 +190,8 @@ describe('D3b Bidirectional & Cross-Agent Sync', () => {
     const updatedSkill = updatedRegistry.skills[skillName]
     assert.equal(updatedSkill.version, '2.0.0')
     assert.ok(updatedSkill.syncedTargets.includes('codex:user'))
+
+    const developmentContent = await readFile(path.join(updatedSkill.localPath, 'SKILL.md'), 'utf8')
+    assert.ok(developmentContent.includes('Claude Version 2'))
   })
 })

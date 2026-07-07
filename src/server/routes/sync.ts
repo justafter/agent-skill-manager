@@ -13,12 +13,13 @@ export function syncRouter(): Router {
       const targets = req.body.targets as TargetKey[] | undefined
       const from = req.body.from as TargetKey | undefined
       const allowManagedModify = !!req.body.allowManagedModify
+      const allowConflictOverwrite = !!req.body.allowConflictOverwrite
 
       if (!skillName) {
         throw new AppError('VALIDATION_ERROR', 'Missing skillName parameter')
       }
 
-      const result = await planSync(skillName, targets, { allowManagedModify, from }, process.cwd())
+      const result = await planSync(skillName, targets, { allowManagedModify, allowConflictOverwrite, from }, process.cwd())
       res.json(result)
     } catch (error) {
       next(error)
@@ -29,12 +30,13 @@ export function syncRouter(): Router {
     try {
       const planId = req.body.planId as PlanId
       const allowManagedModify = !!req.body.allowManagedModify
+      const allowConflictOverwrite = !!req.body.allowConflictOverwrite
 
       if (!planId) {
         throw new AppError('VALIDATION_ERROR', 'Missing planId parameter')
       }
 
-      const result = await applySyncPlan(planId, { allowManagedModify }, process.cwd())
+      const result = await applySyncPlan(planId, { allowManagedModify, allowConflictOverwrite }, process.cwd())
       res.json(result)
     } catch (error) {
       next(error)

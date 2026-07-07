@@ -16,10 +16,63 @@ import { checksumDirectory } from '../utils/hash.js'
 import { pathExists, ensureDir } from '../utils/fs.js'
 import { AppError } from '../utils/errors.js'
 
+async function replaceDirectoryFromSource(sourceDir: string, targetDir: string): Promise<void> {
+  const tempDir = path.join(
+    path.dirname(targetDir),
+    `.${path.basename(targetDir)}.sync-${process.pid}-${Date.now()}`
+  )
+  await rm(tempDir, { recursive: true, force: true })
+  try {
+    await ensureDir(path.dirname(targetDir))
+    await copyDirectory(sourceDir, tempDir)
+    if (await pathExists(targetDir)) {
+      await rm(targetDir, { recursive: true, force: true })
+    }
+    await import('node:fs/promises').then(({ rename }) => rename(tempDir, targetDir))
+  } catch (error) {
+    await rm(tempDir, { recursive: true, force: true })
+    throw error
+  }
+}
+
+async function syncPulledSkillToDevelopmentPath(
+  backupDir: string,
+  skillName: string,
+  sourceDir: string,
+  developmentDir: string,
+  localLibraryDir: string,
+  planId: PlanId
+): Promise<void> {
+  if (path.resolve(developmentDir) === path.resolve(localLibraryDir)) {
+    return
+  }
+
+  if (path.basename(path.resolve(developmentDir)) !== skillName) {
+    throw new AppError(
+      'INVALID_DEVELOPMENT_PATH',
+      `Development path basename must match skill name: ${developmentDir}`,
+      { skillName, developmentDir }
+    )
+  }
+
+  const { backupDevelopmentSkill } = await import('../backup/create.js')
+  await backupDevelopmentSkill(
+    backupDir,
+    skillName,
+    developmentDir,
+    `Development path backup before pull apply ${planId}`
+  )
+
+  await replaceDirectoryFromSource(sourceDir, developmentDir)
+
+  const { parseSkillDir } = await import('../validation/skill.js')
+  await parseSkillDir(developmentDir)
+}
+
 export async function planSync(
   skillName: string,
   targets?: TargetKey[],
-  options: { allowManagedModify?: boolean; from?: TargetKey } = {},
+  options: { allowManagedModify?: boolean; allowConflictOverwrite?: boolean; from?: TargetKey } = {},
   root = process.cwd()
 ): Promise<PlanResult> {
   const registry = await loadRegistry(root)
@@ -203,7 +256,7 @@ export async function planSync(
         targetDir: targetSkillDir
       })
     } else if (status === 'changed') {
-      if (options.allowManagedModify) {
+      if (options.allowManagedModify || options.allowConflictOverwrite) {
         items.push({
           kind: 'modify',
           target: targetSkillDir,
@@ -224,14 +277,25 @@ export async function planSync(
         })
       }
     } else {
-      items.push({
-        kind: 'conflict',
-        target: targetSkillDir,
-        checksumBefore: targetInfo?.checksum || 'unknown',
-        checksumAfter: sourceChecksum,
-        targetKey,
-        targetDir: targetSkillDir
-      })
+      if (options.allowConflictOverwrite && targetInfo) {
+        items.push({
+          kind: 'modify',
+          target: targetSkillDir,
+          checksumBefore: targetInfo.checksum,
+          checksumAfter: sourceChecksum,
+          targetKey,
+          targetDir: targetSkillDir
+        })
+      } else {
+        items.push({
+          kind: 'conflict',
+          target: targetSkillDir,
+          checksumBefore: targetInfo?.checksum || 'unknown',
+          checksumAfter: sourceChecksum,
+          targetKey,
+          targetDir: targetSkillDir
+        })
+      }
     }
   }
 
@@ -243,7 +307,7 @@ export async function planSync(
 
 export async function applySyncPlan(
   planId: PlanId,
-  options: { allowManagedModify?: boolean } = {},
+  options: { allowManagedModify?: boolean; allowConflictOverwrite?: boolean } = {},
   root = process.cwd()
 ): Promise<ApplyResult> {
   const plan = getPlan(planId)
@@ -270,10 +334,15 @@ export async function applySyncPlan(
         continue
       }
 
-      if (item.kind === 'modify' && (item.targetKey as string) !== 'local' && !options.allowManagedModify) {
+      if (
+        item.kind === 'modify' &&
+        (item.targetKey as string) !== 'local' &&
+        !options.allowManagedModify &&
+        !options.allowConflictOverwrite
+      ) {
         throw new AppError(
           'INCONSISTENT_OPTIONS',
-          `Cannot apply modify item without allowManagedModify enabled: ${item.target}`
+          `Cannot apply modify item without overwrite permission enabled: ${item.target}`
         )
       }
 
@@ -293,21 +362,29 @@ export async function applySyncPlan(
           await backupSkillAndRegistry(root, config.backupDir, skillName, `Reverse pull backup for plan ${planId}`)
         }
 
-        if (await pathExists(targetDir)) {
-          await rm(targetDir, { recursive: true, force: true })
-        }
-        await ensureDir(path.dirname(targetDir))
-        await copyDirectory(plan.source, targetDir)
+        await replaceDirectoryFromSource(plan.source, targetDir)
 
         const { parseSkillDir } = await import('../validation/skill.js')
         const newMeta = await parseSkillDir(targetDir)
 
         const existingSkill = registry.skills[skillName]
+        const developmentPath = existingSkill?.localPath
         registry.skills[skillName] = {
           ...newMeta,
           localPath: existingSkill?.localPath || targetDir,
           syncedTargets: existingSkill ? existingSkill.syncedTargets : [],
           projectInstalls: existingSkill ? existingSkill.projectInstalls : []
+        }
+
+        if (developmentPath) {
+          await syncPulledSkillToDevelopmentPath(
+            config.backupDir,
+            skillName,
+            plan.source,
+            developmentPath,
+            targetDir,
+            planId
+          )
         }
 
         const adapters = createAdapters(config)

@@ -180,6 +180,37 @@ describe('D3a Local Library Push Sync', () => {
     assert.ok(content.includes('unmanaged'))
   })
 
+  it('overwrites unmanaged target when allowConflictOverwrite is true', async () => {
+    const skillName = 'test-skill'
+    const targetDir = path.join(codexSkillsDir, skillName)
+
+    const planResult = await planSync(
+      skillName,
+      ['codex:user'],
+      { allowConflictOverwrite: true },
+      tempWorkspace
+    )
+    assert.equal(planResult.plan.items.length, 1)
+    assert.equal(planResult.plan.items[0].kind, 'modify')
+
+    const applyResult = await applySyncPlan(
+      planResult.plan.planId,
+      { allowConflictOverwrite: true },
+      tempWorkspace
+    )
+    assert.equal(applyResult.applied.length, 1)
+    assert.equal(applyResult.applied[0].kind, 'modify')
+
+    const content = await readFile(path.join(targetDir, 'SKILL.md'), 'utf8')
+    assert.ok(!content.includes('unmanaged'))
+    assert.ok(content.includes('Hello'))
+
+    const tag = await readDeployTag(targetDir)
+    assert.ok(tag)
+    assert.equal(tag.managedBy, 'AgentSkillManager')
+    assert.equal(tag.target, 'codex:user')
+  })
+
   it('identifies conflict by default for managed target with changes', async () => {
     const skillName = 'test-skill'
     const targetDir = path.join(claudeSkillsDir, skillName)
@@ -209,19 +240,21 @@ describe('D3a Local Library Push Sync', () => {
 
     // Verify backup created under backups/bk_*
     const backupsDir = path.join(tempWorkspace, 'backups')
-    const backupId = planResult.plan.backupId || (await readdir(backupsDir))[0]
-    
+
     // In D3a backupId is generated dynamically in applySyncPlan
     // Let's find the backup folder
     const backupEntries = await readdir(backupsDir)
-    const bkId = backupEntries.find(e => e.startsWith('bk_'))
-    assert.ok(bkId)
-
-    const backupIndexFile = path.join(backupsDir, bkId, 'index.json')
-    assert.ok(await pathExists(backupIndexFile))
-
-    const backupIndex = JSON.parse(await readFile(backupIndexFile, 'utf8'))
-    assert.ok(backupIndex.items.find((item: any) => item.targetAgent === 'claude' && item.targetType === 'user'))
+    let foundClaudeBackup = false
+    for (const entry of backupEntries.filter(e => e.startsWith('bk_'))) {
+      const backupIndexFile = path.join(backupsDir, entry, 'index.json')
+      if (!(await pathExists(backupIndexFile))) continue
+      const backupIndex = JSON.parse(await readFile(backupIndexFile, 'utf8'))
+      if (backupIndex.items.find((item: any) => item.targetAgent === 'claude' && item.targetType === 'user')) {
+        foundClaudeBackup = true
+        break
+      }
+    }
+    assert.ok(foundClaudeBackup)
 
     // Verify target file is updated
     const content = await readFile(path.join(targetDir, 'SKILL.md'), 'utf8')

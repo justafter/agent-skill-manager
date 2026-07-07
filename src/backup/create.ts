@@ -71,6 +71,45 @@ export async function backupSkillAndRegistry(
   return index
 }
 
+export async function backupDevelopmentSkill(
+  backupDir: string,
+  skillName: string,
+  developmentPath: string,
+  reason: string
+): Promise<BackupIndex> {
+  const backupId = `bk_${Date.now()}_${randomUUID().slice(0, 8)}`
+  const destDir = path.join(backupDir, backupId)
+  await ensureDir(destDir)
+
+  const items: BackupItem[] = []
+
+  if (await pathExists(developmentPath)) {
+    const backupSkillDir = path.join(destDir, 'development', 'skills', skillName)
+    await ensureDir(path.dirname(backupSkillDir))
+    await copyDirectory(developmentPath, backupSkillDir)
+    items.push({
+      type: 'skill',
+      skillName,
+      originalPath: developmentPath,
+      backupPath: backupSkillDir,
+      targetType: 'development',
+      targetAgent: 'development',
+      targetSkillPath: developmentPath
+    })
+  }
+
+  const index: BackupIndex = {
+    backupId,
+    createdAt: new Date().toISOString(),
+    reason,
+    items
+  }
+
+  await atomicWriteJson(path.join(destDir, 'index.json'), index)
+  return index
+}
+
+
 export async function createManualBackup(
   root = process.cwd(),
   skillName?: string,

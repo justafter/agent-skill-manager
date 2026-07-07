@@ -172,6 +172,16 @@ a {
   border-color: #aeb9c4;
 }
 
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.button:disabled:hover {
+  background: inherit;
+  border-color: inherit;
+}
+
 .button-primary {
   background: #1f6feb;
   color: #ffffff;
@@ -181,6 +191,13 @@ a {
 .button-primary:hover {
   background: #1a5cbf;
   border-color: #1a5cbf;
+}
+
+.button-primary:disabled,
+.button-primary:disabled:hover {
+  background: #94a3b8;
+  border-color: #94a3b8;
+  color: #ffffff;
 }
 
 .button-danger {
@@ -515,4 +532,3 @@ a {
     opacity: 0.4;
   }
 }
-
