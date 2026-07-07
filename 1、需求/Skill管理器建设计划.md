@@ -718,7 +718,7 @@ D:\Obsidian笔记\.agents\skills\<skill-name>
 
 Rule 与 Skill 的展示能力对齐，但 **仅做项目级**（无全局 Rule 安装路径、无用户级 Rule 同步）。
 
-- **模板目录可配置**：不再硬编码 `<workspace>/library/rules`。服务端从 `config.ruleTemplateDir` 读取模板根目录；未配置时返回 `CONFIG_MISSING` 错误。RulesPage 顶部 toolbar 显示当前模板目录，旁有"切换模板目录…"按钮（弹 modal，复用 `<DirectoryPicker>`）；后端 `PUT /api/config/rule-template-dir { path }` 持久化到 `~/.skill-manager/config.json` 并自动创建不存在的目录。
+- **模板目录可配置**（仅写入 user config）：不再硬编码 `<workspace>/library/rules`。服务端从 `config.ruleTemplateDir` 读取模板根目录；未配置时返回 `CONFIG_MISSING` 错误。RulesPage 顶部 toolbar 显示当前模板目录，旁有"切换模板目录…"按钮（弹 modal，复用 `<DirectoryPicker>`）；后端 `PUT /api/config/rule-template-dir { path }` 通过 `saveConfig(...)` **仅写入 `~/.skill-manager/config.json`（user config）**，不修改仓库根 `skill-manager.config.json`，避免污染共享仓库。`saveConfig` 后续的 deep merge 会让 user config 覆盖仓库默认。
 - 入口：顶部导航 `Rule 模板库` → `/rules`。
 - 路由：独立路由 `web/src/pages/RulesPage.tsx`，不复用 `SkillsPage`。
 - 数据源：

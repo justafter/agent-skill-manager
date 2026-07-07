@@ -3,7 +3,6 @@ import { loadConfig } from '../../core/config.js'
 import { loadRegistry } from '../../core/registry.js'
 import { createAdapters } from '../../adapters/registry.js'
 import { identifySkillState } from '../../adapters/scan.js'
-import { scanDevelopmentSkills } from '../../core/development-scan.js'
 import { pathExists } from '../../utils/fs.js'
 import type { TargetKey, AgentId } from '../../types/adapter.js'
 
@@ -22,12 +21,10 @@ export function skillsRouter(): Router {
       )
 
       const untracked: Record<TargetKey, { name: string; path: string }[]> = {} as any
-      const development = await scanDevelopmentSkills(skills)
       const skillsMap = new Map<string, any>(skills.map(s => [
         s.name,
         {
           ...s,
-          development: development[s.name],
           targets: {} as Record<TargetKey, string>,
           installedPaths: {} as Record<TargetKey, string>
         }
@@ -86,7 +83,7 @@ export function skillsRouter(): Router {
         }
       }
 
-      res.json({ skills: Array.from(skillsMap.values()), untracked, development })
+      res.json({ skills: Array.from(skillsMap.values()), untracked })
     } catch (error) {
       next(error)
     }

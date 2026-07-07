@@ -12,6 +12,7 @@ export function SkillsPage() {
 
   const [activeTab, setActiveTab] = useState<string>('all')
   const [isScanning, setIsScanning] = useState(false)
+  const [developmentBySkill, setDevelopmentBySkill] = useState<Record<string, any>>({})
   const [refreshingSkillName, setRefreshingSkillName] = useState<string | null>(null)
 
   const handleToggleWatch = async (skillName: string, enabled: boolean) => {
@@ -55,7 +56,8 @@ export function SkillsPage() {
   const handleScan = async () => {
     try {
       setIsScanning(true)
-      await apiPost('/api/scan')
+      const scanResult = await apiPost<any>('/api/scan')
+      setDevelopmentBySkill(scanResult.development || {})
       await refetch()
     } catch (err) {
       alert(`扫描失败: ${(err as Error).message}`)
@@ -149,6 +151,8 @@ export function SkillsPage() {
         force: true,
         skip: false
       })
+      const scanResult = await apiPost<any>('/api/scan')
+      setDevelopmentBySkill(scanResult.development || {})
       await refetch()
     } catch (err) {
       alert(`更新本地库失败: ${(err as Error).message}`)
@@ -244,7 +248,7 @@ export function SkillsPage() {
             onClick={handleScan}
             disabled={isScanning}
           >
-            {isScanning ? '正在扫描...' : '扫描目标目录'}
+            {isScanning ? '正在检查...' : '检查更新'}
           </button>
         </div>
       </div>
@@ -288,7 +292,7 @@ export function SkillsPage() {
               version={skill.version}
               checksum={skill.checksum}
               localPath={skill.localPath}
-              development={skill.development}
+              development={developmentBySkill[skill.name]}
               targets={skill.targets || {}}
               syncedTargets={skill.syncedTargets || []}
               projectInstalls={skill.projectInstalls || []}

@@ -31,6 +31,7 @@
 - **失败写入 watch error log**，不中断 watch 进程。
 - **PID 文件**：CLI 后台运行 watch 时写 PID 文件，方便 stop / 状态查询。
 - **Antigravity 加载状态**：UI 显示三态——"路径已写入 / 加载已验证 / 加载未验证"。首版"加载验证"用 Antigravity 是否能读到 `~/.gemini/config/skills/<skill>` 目录作为代理判定。
+- **Rule 模板目录可配置**（D9 增补）：D8 的 `planRuleSync` / `applyRuleSync` 与 `RulesPage` 不再硬编码 `<root>/library/rules`，模板根目录统一从 `config.ruleTemplateDir` 解析；未配置时返回 `CONFIG_MISSING` 错误并要求先在 UI 里"切换模板目录"。RulesPage 顶部 toolbar 增加"切换模板目录…"按钮（弹 modal，复用 `<DirectoryPicker>`），后端 `PUT /api/config/rule-template-dir` 持久化到 `~/.skill-manager/config.json` 并自动 mkdir 不存在的目录。这样既兼容"在仓库 `library/rules` 里手写"的场景，也允许用户把模板目录放到任意绝对路径。
 
 ---
 
