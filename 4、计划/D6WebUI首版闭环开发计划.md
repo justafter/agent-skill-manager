@@ -5,11 +5,12 @@
 ## 涉及文件
 
 - `web/src/App.tsx` - 路由与顶部导航
-- `web/src/pages/SkillsPage.tsx` - Skill 列表、扫描、同步 plan/apply、确认弹窗；与 D3a/D3b 同步流程绑定
-- `web/src/pages/ImportPage.tsx` - 导入页面，调 `/api/import`
+- `web/src/pages/SkillsPage.tsx` - Skill 列表、扫描、同步 plan/apply、确认弹窗；与 D3a/D3b 同步流程绑定；首页内"导入技能"按钮 + modal 表单（合并自原 ImportPage，详见 §2.x NewImport）；未托管列表的"一键导入"
 - `web/src/pages/BackupPage.tsx` - 备份列表与还原二次确认
-- `web/src/pages/ProjectSpacePage.tsx` - 项目空间（D7 实施后再细化）
-- `web/src/components/SkillCard.tsx` - 单 Skill 行，多目标状态徽标 + 同步 / 拉回按钮
+- `web/src/pages/ProjectSpacePage.tsx` - 项目空间（D7 实施后再细化），项目卡片支持展开"已安装路径"折叠区
+- `web/src/pages/RulesPage.tsx` - Rule 模板库（独立路由 `/rules`），仅项目级；详见 §2.11
+- `web/src/components/SkillCard.tsx` - 单 Skill 行，多目标状态徽标 + 同步 / 拉回按钮 + 卡片底部"查看已安装路径"折叠 + 描述下方常驻"导入目录"行
+- `web/src/components/DirectoryPicker.tsx` - 通用目录选择器（手动 / `showDirectoryPicker` / `<input webkitdirectory>` 三模式；用于首页导入与项目添加，详见 §2.x DirPicker）
 - `web/src/components/PlanConfirmDialog.tsx` - plan 确认窗口，必须展示冲突项与 apply 按钮置灰规则
 - `web/src/components/DiffView.tsx` - 文本级 diff 渲染
 - `web/src/components/ProjectList.tsx` - 项目列表（D7 实施后再细化）
@@ -62,7 +63,7 @@
 ### 2.4 ImportsPage / BackupPage 错误反馈统一
 
 - `BackupPage`：保留 `window.confirm` 作为 restore 二次确认；其他路径全部改用 toast。`alert('[Success] Restored successfully!...')` 改成 toast。
-- `ImportPage`：当前用 `feedback` state 在表单内显示，成功与失败分别用绿底/红底。保留现有结构，但补上错误码展示（D5 中间件会返回 `{ error: { code, message } }`，UI 解析 `err` 中的 code 展示给用户）。
+- `SkillsPage` 内的导入 modal（取代旧 `ImportPage`）保留当前的 `feedback` state 在表单内显示成功/跳过/失败三态；后台 toast 化推迟到 `useToast` 替换 stub 之后。
 
 ### 2.5 ProjectSpacePage 与 ProjectList 占位
 
@@ -70,6 +71,8 @@
   - 项目列表接入 `GET /api/projects`。
   - 项目详情页接入 `POST /api/projects`、项目扫描、项目级 Skill 注入、规则同步。
 - D6 在 ProjectSpacePage 顶部加一个明确的"D7 即将上线"提示，避免用户误以为功能缺失。
+
+> 实施后续补：ProjectSpacePage 顶部 toolbar 增加"添加项目"按钮（已有）；项目卡片支持折叠展示"检测到 Skill 目录"与"检测到 Rule 文件"的绝对路径列表，复用 `<DirectoryPicker>` 的"路径行"样式（flex 居中、tag 等宽、`flex: 1; min-width: 0`）。
 
 ### 2.6 i18n 风格
 
@@ -81,6 +84,70 @@
 
 - 保持当前实现。`DiffView` 在 D6 仅在 console 或临时调试入口使用，不上正式 UI。
 - `RuleTemplateEditor` 在 D8 实施时接入。
+
+### 2.8 Skill 卡片新增"导入目录"与"已安装路径"展示
+
+- 每个 `SkillCard` 描述文本下方常驻一行 `导入目录: <localPath>`（monospace、自动换行、hover 显示完整），来源是注册表 `registry.skills[name].localPath`。
+- 卡片底部新增按钮 "查看已安装路径（<N> 处）▾"，点击展开一个折叠区。
+- 折叠区按行展示 `<AGENT> · <user|project>` 标签 + 绝对路径：
+  - 用户级绝对路径：来自 `adapter.scanUserSkills()` 扫到的 `TargetSkillInfo.localPath`，对应 `<userSkillPath>/<skillName>`。
+  - 项目级绝对路径：由 `skill.projectInstalls[i].target` + 该项目的注册 `path` + `targets[agent].projectSkillPath` 拼出，格式 `<projectPath>/<projectSkillPath>/<skillName>`。
+- 行内样式约束（与 D6 §2.5 项目卡片路径行同源）：
+  - 单行 flex + `align-items: center`（视觉对齐到中间）。
+  - 标签 `min-width: 90px; text-align: center`（CLAUDE·user / CODEX·user / GEMINI·user 等宽整齐）。
+  - 路径 `<span>` 设 `flex: 1; min-width: 0`，确保窄列下 `word-break: break-all` 正常换行、不撑爆容器。
+  - 行间 `padding: 4px 0` 留白。
+- 服务端在 `GET /api/skills` 返回每个 skill 的 `installedPaths: Record<TargetKey, absolutePath>`，由 server 一次性算好，前端只负责渲染。
+
+### 2.9 首页内"导入技能"入口（NewImport）
+
+- 旧版独立的 `/import` 路由与 `ImportPage.tsx` 页面**已合并**到首页（Skill 列表）顶部的 toolbar，以**模态对话框**形式提供，导航栏不再保留"导入技能"项。
+- 入口：首页 toolbar 左侧新增 `导入技能` 次按钮（普通样式），与右侧 `扫描目标目录` 主按钮并列。
+- 字段：
+  - 源目录路径（绝对路径，必填）。使用通用 `<DirectoryPicker>` 组件。
+  - `强制覆写`（覆盖前会创建注册表与本地备份，默认关闭）。
+  - `如果校验和一致则跳过`（默认关闭）。
+- 行为：点击 `导入 Skill` 后调用 `POST /api/import`，参数 `{ path, force, skip }`。
+- 反馈：成功/跳过/失败三类消息以彩色提示框显示在对话框内；成功后自动 `refetch()` Skill 列表，刷新"导入目录"行。
+- 取消：右上角 `×` 或底部 `取消` 按钮，关闭对话框并清空当前输入与反馈。
+- 同时，SkillsPage 已有的"未托管技能"面板上"一键导入"按钮行为保持不变（`path = untracked.item.path`，`force: false, skip: true`），不再与 NewImport 冲突。
+
+### 2.10 通用目录选择器 `<DirectoryPicker>`
+
+为所有需要"绝对目录路径"的输入框提供一致的三模式选择体验。组件首版用在两处：
+
+- 首页"导入技能"对话框的源目录路径。
+- 项目空间页"添加项目"对话框的项目路径。
+
+设计原则：
+
+- **永远不擅自编造路径**。浏览器安全沙箱下 `<input webkitdirectory>` 拿不到绝对路径；组件只把目录名回填给输入框，并以提示语告知用户补全。
+- **能力检测**：组件挂载时探测 `window.showDirectoryPicker` 是否可用；可用则按钮直接调用 `showDirectoryPicker()`（Chromium 系列浏览器能拿到真实绝对路径）；不可用则 fallback 到 `<input type="file" webkitdirectory>`。
+- **状态反馈**：组件内部维护 `idle / picked(native|webkit) / failed` 三种状态，分别用绿色成功提示、红色失败提示呈现。
+- **可复用**：组件接受 `value / onChange / placeholder / disabled / hint` 标准 props，后续"备份恢复""批量导入"等流程可复用。
+- **不入后端**：首版不引入 `/api/browse-dir` 等后端目录浏览接口；如需远程浏览（如 SSH/远端机器）后续再扩展。
+
+### 2.11 Rule 模板库页面（独立路由）
+
+Rule 展示能力与 Skill 对齐，但**仅项目级**（无用户级 Rule 同步）。
+
+- 入口：顶部导航 `Rule 模板库` → `/rules`。
+- **模板目录可配置**：服务端从 `config.ruleTemplateDir` 读取模板根目录，不再硬编码 `<root>/library/rules`。RulesPage 顶部 toolbar 显示当前模板目录 + "切换模板目录…"按钮（弹 modal，复用 `<DirectoryPicker>`）；后端 `PUT /api/config/rule-template-dir` 持久化到 `~/.skill-manager/config.json` 并自动 mkdir。
+- 服务端：`GET /api/rules` 返回 `{ rules: [{ agent, name, localPath, installedPaths: [{ projectId, projectName, path, exists }] }] }`；`GET /api/rules/diff?projectId=<id>&agent=<agent>` 复用 `planRuleSync`。
+- `installedPaths` 全量列出所有已注册项目对该 Rule 的项目级路径；不按 `enabledAgents` 过滤。
+- 卡片元素：标题 + `<AGENT>` tag + 已注册项目数；常驻"本地模板路径"行；折叠区按项目分卡片：
+  - 行样式：`<AGENT> · project` tag 等宽（`min-width: 90px; text-align: center`），项目名 + 路径 `flex: 1; min-width: 0`；与 Skill 卡片路径行同源。
+  - 三个按钮：`查看 Diff` → 调 diff；`拉取 ↓` → mode=pull；`推送 ↑` → mode 自适应（conflict → overwrite，否则 block）。
+  - 反馈：成功/失败以彩色提示框显示在项目卡片内。
+- 设计约束：
+  - **不引入用户级 Rule 概念**。Rule 没有"全局"安装路径；只有 `<AGENT> · project` 一种 scope。
+  - 不改 `rules/plan.ts` / `rules/apply.ts` / `rules/template.ts` / `rules/block.ts`。
+  - 涉及文件：新增 `src/server/routes/rules.ts`、`web/src/pages/RulesPage.tsx`；修改 `src/server/app.ts`、`web/src/App.tsx`。
+- **页脚"项目内跨 Agent 互推"区块**（D8 §2.6）：
+  - 按已注册项目分组，每组一张 `3 × 3` 互推矩阵；行=源 Agent、列=目标 Agent、对角线禁用。
+  - 每格两个按钮：`block`（推荐；按托管块语义搬运）、`overwrite`（整文件覆写）。
+  - 点击后 `window.confirm` 二次确认；结果以小字显示在格内。
+  - 后端调 `POST /api/projects/:id/rules/cross-sync { sourceAgent, targetAgent, mode }`；触发核心函数 `crossSyncRule(...)`。
 
 ## 3. 验收口径
 
@@ -99,6 +166,10 @@
 - 备份页创建备份、列表更新、还原二次确认、提示 toast。
 - 错误场景：从 API 触发 `VALIDATION_ERROR`、`PLAN_NOT_FOUND`，UI 通过 toast 展示。
 - Tab 切换：`全部 / 缺失 / 已同步 / 冲突 / 项目级` 计数正确。
+- 首页导入流程：点击 `导入技能` → modal 弹出 → 输入路径或用 `DirectoryPicker` 选择目录（Chromium 浏览器应直接返回绝对路径，其他浏览器仅返回目录名） → 点击 `导入 Skill` → 反馈框显示成功/跳过/失败 → 列表自动刷新，对应 Skill 卡片下方出现 `导入目录: <localPath>`。
+- 卡片路径展示：点击 `查看已安装路径（N 处）▾` → 折叠区按行展示 `<AGENT> · <user|project>` + 绝对路径；tag 等宽整齐，路径在窄列下能正常换行；点击 `收起 ▴` 折叠。
+- 项目添加流程：点击 `添加项目` → modal 弹出 → 输入项目路径或用 `DirectoryPicker` 选择目录 → 探测逻辑自动推断 `enabledAgents`（含 codex/gemini 共享 `.agents` 的去重规则） → 列表刷新。
+- Rule 模板库（独立路由）：点击导航 `Rule 模板库` → 进入 `/rules` → 3 张模板卡片显示本地模板路径与已注册项目数 → 展开"项目级安装路径"折叠区 → 每项目显示绝对路径 + 已存在/未创建 → 点击 `查看 Diff` 加载 patch → 点击 `推送 ↑` / `拉取 ↓` 触发同步，反馈框提示结果。
 
 ## 4. 风险与待确认
 

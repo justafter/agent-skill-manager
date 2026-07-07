@@ -11,7 +11,7 @@
 - `src/projects/inject.ts` - 项目级注入计划与物理执行逻辑
 - `src/cli/project.ts` - CLI 中的 `asm project` 命令组实现
 - `src/server/routes/projects.ts` - 本地 HTTP API 路由
-- `web/src/pages/ProjectSpacePage.tsx` - 前端项目空间管理页面
+- `web/src/pages/ProjectSpacePage.tsx` - 前端项目空间管理页面；项目卡片支持展开"已安装路径"折叠区（与 D6 §2.8 同源样式：flex 居中、tag 等宽、`flex: 1; min-width: 0`）；"添加项目"对话框使用 `<DirectoryPicker>` 组件
 
 ---
 
@@ -38,6 +38,7 @@
 - `asm project add <name> <path>`：
   - 验证物理路径真实存在，若不存在则报错。
   - 自动生成项目的唯一 ID，智能检测项目根目录下的 `.claude`、`.agents` 等目录，自动填充 `enabledAgents`。
+  - **Antigravity 探测规则**：Gemini / Antigravity 在项目级**复用** `.agents/`（与 Codex 共享同一目录），探测时 `codex` 与 `gemini` 都使用 `.agents` 探测键；项目注册时**按 agent 名去重**（`Set<AgentId>`），保证每个 agent 至少出现一次、不会因共享目录导致漏探测或多探测。
   - 调用 `saveConfig` 持久化项目配置。
 - `asm project scan <project-id>`：重新扫描项目级目录下的技能安装状态，为 Web UI 与状态同步提供基础。
 - `asm project inject <project-id> <skill-name> --agent <agent> [--dry-run]`：向项目下的特定 Agent 目录注入指定的 Skill。若指定 `--dry-run` 则只生成并打印 Plan，不进行真实物理操作。
@@ -77,7 +78,10 @@
   - 验证本地 registry.json 的 `projectInstalls` 正确写入了本次部署记录。
 
 ### 3.2 手动检查
-- 使用 CLI：运行 `asm project add test-proj D:\Project_by_AI\Skill-mamnager` 并用 `asm project list` 查看。
+- 使用 CLI：运行 `asm project add test-proj D:\Project_by_AI\Skill-mamnager` 并用 `asm project list` 查看，`enabledAgents` 字段反映实际探测结果。
+- **探测去重**：在仅含 `.agents/` 的项目上注册，`enabledAgents` 应同时包含 `codex` 与 `gemini`（共享目录但各自独立）；在仅含 `.claude/` 的项目上注册，应只含 `claude`；两者都含时三者齐全。
+- **项目级 Skill 目录**：项目级 Skill 注入到 `.claude/skills/<skill-name>` 或 `.agents/skills/<skill-name>`（Gemini/Antigravity 在项目级复用 `.agents/skills`，与 Codex 共用）。
 - 运行 `asm project inject` 注入一个技能，查看项目下目录文件确实生成。
 - 运行 Web UI，检查项目空间中注册成功，且能够一键注入并得到同步成功的反馈。
 - 检查备份目录下确实产生了对应的技能备份文件。
+- 项目卡片展开"已安装路径"折叠区，确认 Skill 目录与 Rule 文件路径正确显示。

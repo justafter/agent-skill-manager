@@ -70,18 +70,18 @@ export function registerProjectCommand(program: Command): void {
         // Detect enabled agents based on folder structures
         const detectedAgents: AgentId[] = []
         // Note: gemini shares `.agents` with codex at the project level,
-        // so we dedupe via a Set keyed on the detected folder.
+        // so we dedupe by agent (each agent appears at most once).
         const agentsToCheck: { agent: AgentId; folder: string }[] = [
           { agent: 'claude', folder: '.claude' },
           { agent: 'codex', folder: '.agents' },
           { agent: 'gemini', folder: '.agents' }
         ]
-        const detectedFolders = new Set<string>()
+        const detectedAgentsSet = new Set<AgentId>()
         for (const check of agentsToCheck) {
-          if (detectedFolders.has(check.folder)) continue
+          if (detectedAgentsSet.has(check.agent)) continue
           if (await pathExists(path.join(absPath, check.folder))) {
             detectedAgents.push(check.agent)
-            detectedFolders.add(check.folder)
+            detectedAgentsSet.add(check.agent)
           }
         }
 

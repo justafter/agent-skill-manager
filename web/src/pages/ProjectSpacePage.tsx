@@ -3,10 +3,14 @@ import { useApi } from '../hooks/useApi'
 import { apiPost, apiGet } from '../api/client'
 import { PlanResult } from '../components/PlanConfirmDialog'
 import { DiffView } from '../components/DiffView'
+import { DirectoryPicker } from '../components/DirectoryPicker'
 
 export function ProjectSpacePage() {
   const { data: projectsData, refetch, isLoading } = useApi<any>('projects', '/api/projects')
   const { data: skillsData } = useApi<any>('skills', '/api/skills')
+
+  // Per-project "show installed paths" expansion state
+  const [expandedProjects, setExpandedProjects] = useState<Record<string, boolean>>({})
 
   // Add Project Dialog State
   const [addDialogOpen, setAddDialogOpen] = useState(false)
@@ -239,7 +243,78 @@ export function ProjectSpacePage() {
                 <div style={{ display: 'flex', gap: '12px', marginTop: '6px', fontSize: '12px', color: '#64748b' }}>
                   <span>检测到 Skill 目录: <strong>{project.scan?.skillDirs?.length || 0}</strong> 个</span>
                   <span>检测到 Rule 文件: <strong>{project.scan?.ruleFiles?.length || 0}</strong> 个</span>
+                  {(project.scan?.skillDirs?.length || 0) + (project.scan?.ruleFiles?.length || 0) > 0 && (
+                    <button
+                      type="button"
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: '#2563eb',
+                        cursor: 'pointer',
+                        padding: 0,
+                        fontSize: '12px',
+                        textDecoration: 'underline'
+                      }}
+                      onClick={() =>
+                        setExpandedProjects((prev) => ({
+                          ...prev,
+                          [project.id]: !prev[project.id]
+                        }))
+                      }
+                    >
+                      {expandedProjects[project.id] ? '收起路径 ▴' : '查看已安装路径 ▾'}
+                    </button>
+                  )}
                 </div>
+                {expandedProjects[project.id] && (
+                  <div
+                    style={{
+                      marginTop: '8px',
+                      padding: '8px 10px',
+                      background: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '4px',
+                      fontSize: '12px'
+                    }}
+                  >
+                    {(project.scan?.skillDirs?.length || 0) > 0 && (
+                      <div style={{ marginBottom: '4px' }}>
+                        <span style={{ color: '#475569', fontWeight: 600 }}>Skill 目录：</span>
+                        {project.scan.skillDirs.map((dir: string, i: number) => (
+                          <div
+                            key={`s-${i}`}
+                            style={{
+                              fontFamily: 'monospace',
+                              color: '#1e293b',
+                              wordBreak: 'break-all',
+                              paddingLeft: '12px'
+                            }}
+                          >
+                            {dir}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {(project.scan?.ruleFiles?.length || 0) > 0 && (
+                      <div>
+                        <span style={{ color: '#475569', fontWeight: 600 }}>Rule 文件：</span>
+                        {project.scan.ruleFiles.map((file: string, i: number) => (
+                          <div
+                            key={`r-${i}`}
+                            style={{
+                              fontFamily: 'monospace',
+                              color: '#1e293b',
+                              wordBreak: 'break-all',
+                              paddingLeft: '12px'
+                            }}
+                          >
+                            {file}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
               <div className="skill-right">
                 <button
@@ -290,15 +365,13 @@ export function ProjectSpacePage() {
 
                 <div className="form-group">
                   <label htmlFor="projPath">本地绝对路径</label>
-                  <input
+                  <DirectoryPicker
                     id="projPath"
-                    type="text"
-                    className="form-input"
-                    placeholder="例如：D:\Projects\my-app"
                     value={projectPath}
-                    onChange={(e) => setProjectPath(e.target.value)}
+                    onChange={setProjectPath}
+                    placeholder="例如：D:\Projects\my-app"
                     disabled={isAdding}
-                    required
+                    hint="支持手动输入，或点击右侧 “选择目录…” 按钮（仅 Chromium 系列浏览器可返回绝对路径）。"
                   />
                 </div>
               </div>

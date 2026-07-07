@@ -15,7 +15,7 @@
 
 首版不做远程市场和完整插件生态，只做本地管理能力：
 
-- 已安装技能列表
+- 已安装技能列表（含各 Agent 用户级 / 项目级绝对路径展示）
 - 导入已有 skill
 - 同步到目标 agent
 - 选择项目注入项目级 Skill
@@ -633,10 +633,12 @@ D:\Obsidian笔记\.agents\skills\<skill-name>
 
 - 页面标题：`Skills 管理`
 - 全局操作区：
+  - `Skill 列表`（首页）
+  - `Rule 模板库`（独立路由 `/rules`，详见 §3e）
   - `项目空间`
-  - `从备份中恢复`
-  - `导入已有`
-  - `发现技能`，首版仅作为占位
+  - `备份管理`
+
+> 旧版独立的"导入技能"导航与 `/import` 页面已合并到首页（Skill 列表）顶部的 toolbar，以模态对话框形式提供；详见 §3c。
 
 ### 2. 统计与过滤状态栏
 
@@ -661,6 +663,17 @@ D:\Obsidian笔记\.agents\skills\<skill-name>
 - 最新变更来源提示。
 - 同步、diff、备份、删除等操作。
 
+**导入目录与已安装路径展示**：
+
+- 描述文本下方常驻一行 "导入目录: `<localPath>`"（monospace，自动换行，hover 显示完整），来源是注册表 `registry.skills[name].localPath`。
+- 卡片底部提供"查看已安装路径 ▾"按钮，文本标注已安装条目数；点击展开一个折叠区。
+- 折叠区按"`<AGENT> · <user|project>` 标签 + 绝对路径"的行展示。
+  - 用户级绝对路径：来自 `adapter.scanUserSkills()` 扫到的 `TargetSkillInfo.localPath`，对应 `<userSkillPath>/<skillName>`。
+  - 项目级绝对路径：由 `skill.projectInstalls[i].target` + 该项目的注册 `path` + `targets[agent].projectSkillPath` 拼出，格式 `<projectPath>/<projectSkillPath>/<skillName>`。
+- **行内布局**：单条路径行使用 flex 布局 + `align-items: center`，使标签与路径在垂直方向居中对齐；标签 `min-width: 90px`、`text-align: center`，使 `CLAUDE · user` / `CODEX · user` / `GEMINI · user` 等标签等宽整齐排列；路径 `<span>` 设 `flex: 1; min-width: 0`，确保在窄列下仍能 `word-break: break-all` 正常换行，不会撑爆容器或贴边。行间使用 `padding: 4px 0` 留白。
+- **容器**：折叠区本身放在 `.skill-left` 内部，外层 `.skill-row` 的 `align-items: center` 只对一级子元素生效，不影响嵌套布局。
+- 同样的设计同时用在"项目空间"页的项目卡片上：默认折叠、点击展开项目内 Skill 目录与 Rule 文件的绝对路径列表。
+
 ### 3b. 未托管的技能 (Untracked) 展示区
 
 为了方便用户发现并托管已存在于各 Agent 环境中但尚未纳入管理器统一登记的技能，系统设计：
@@ -668,6 +681,120 @@ D:\Obsidian笔记\.agents\skills\<skill-name>
 - **未托管技能扫描**：在扫描目标 Agent 用户级目录时，自动提取所有包含 `SKILL.md` 但未在 `registry.json` 中注册的技能文件夹，并解析出它们的名称及绝对路径。
 - **UI 界面展示**：在本地权威 Skill 列表下方展示独立的“检测到未托管的技能 (Untracked)”面板，展示其来源目标、技能名称、绝对路径。
 - **一键托管导入**：为每一条未托管的技能配置“导入”操作按钮，点击后自动将其绝对路径传入导入 API 完成一键导入并刷新，直接将其收编管理。
+
+### 3c. 首页内"导入技能"入口
+
+首页（Skill 列表）顶部 toolbar 同时承载"扫描目标目录"与"导入技能"两个操作。"导入技能"以**模态对话框**形式提供，不占用首页常驻空间：
+
+- 入口：首页 toolbar 左侧新增 `导入技能` 次按钮（普通样式），点击打开对话框。
+- 字段：
+  - 源目录路径（绝对路径，必填）。使用通用 `<DirectoryPicker>` 组件，支持三种输入方式（详见 §3d）：
+    - 手动键入路径（任意浏览器均可用）。
+    - Chromium 系列浏览器走 `window.showDirectoryPicker()`，可直接拿到绝对路径。
+    - 其它浏览器走隐藏 `<input type="file" webkitdirectory>`，仅返回目录名，组件提示用户补全为绝对路径。
+  - `强制覆写`（覆盖前会创建注册表与本地备份，默认关闭）。
+  - `如果校验和一致则跳过`（默认关闭）。
+- 行为：点击 `导入 Skill` 后调用 `POST /api/import`，参数 `{ path, force, skip }`。
+- 反馈：成功/跳过/失败三类消息以彩色提示框显示在对话框内；成功后自动 `refetch()` Skill 列表，刷新"导入目录"行。
+- 取消：右上角 `×` 或底部 `取消` 按钮，关闭对话框并清空当前输入与反馈。
+- 该入口取代了旧版 `/import` 独立路由与 `ImportPage.tsx` 页面；导航栏不再保留独立"导入技能"项。
+
+### 3d. 通用目录选择器 `<DirectoryPicker>`
+
+为所有需要"绝对目录路径"的输入框提供一致的三模式选择体验，组件名 `DirectoryPicker`，首版用在两处：
+
+- 首页"导入技能"对话框的源目录路径。
+- 项目空间页"添加项目"对话框的项目路径。
+
+设计原则：
+
+- **永远不擅自编造路径**。浏览器安全沙箱下 `<input webkitdirectory>` 拿不到绝对路径；组件只把目录名回填给输入框，并以提示语告知用户补全。
+- **能力检测**：组件挂载时探测 `window.showDirectoryPicker` 是否可用；可用则按钮文案不变、能力更优；不可用则 fallback 到 webkit input。
+- **状态反馈**：组件内部维护 `idle / picked(native|webkit) / failed` 三种状态，分别用绿色成功提示、红色失败提示呈现。
+- **可复用**：组件接受 `value / onChange / placeholder / disabled / hint` 标准 props，可在后续"添加项目""备份恢复"等流程中复用。
+- **不入后端**：首版不引入 `/api/browse-dir` 等后端目录浏览接口，所有选取都在前端完成；后续若需要远程浏览（如 SSH/远端机器）再扩展。
+
+### 3e. Rule 模板库（独立路由）
+
+Rule 与 Skill 的展示能力对齐，但 **仅做项目级**（无全局 Rule 安装路径、无用户级 Rule 同步）。
+
+- **模板目录可配置**：不再硬编码 `<workspace>/library/rules`。服务端从 `config.ruleTemplateDir` 读取模板根目录；未配置时返回 `CONFIG_MISSING` 错误。RulesPage 顶部 toolbar 显示当前模板目录，旁有"切换模板目录…"按钮（弹 modal，复用 `<DirectoryPicker>`）；后端 `PUT /api/config/rule-template-dir { path }` 持久化到 `~/.skill-manager/config.json` 并自动创建不存在的目录。
+- 入口：顶部导航 `Rule 模板库` → `/rules`。
+- 路由：独立路由 `web/src/pages/RulesPage.tsx`，不复用 `SkillsPage`。
+- 数据源：
+  - 服务端新增 `GET /api/rules`，返回 `{ rules: [{ agent, name, localPath, installedPaths: [...] }] }`。
+  - `localPath` 为本地权威模板绝对路径（`library/rules/<agent>/<file>`）。
+  - `installedPaths` 列出**所有**已注册项目对该 Rule 的项目级安装路径：`<project.path>/<fileName>` + 是否存在（由 `scanProject(p).ruleFiles` 判定）；首版对每个 agent 全量列出，不做"agent 必须出现在 `enabledAgents` 才显示"的过滤。
+- 卡片元素：
+  - 标题 `<fileName>` + `<AGENT>` tag + 已注册项目数。
+  - **本地模板路径**（常驻，monospace，自动换行，hover title）：来自 `localPath`。
+  - **项目级安装路径折叠区**：每行展示 `<AGENT> · project` tag + `<projectName>` + 绝对路径 + "已存在 / 未创建" 状态；与 §3.8 Skill 卡片同款样式（`min-width: 90px` 等宽、路径 `flex: 1; min-width: 0`）。
+- 同步入口：每个项目卡片（折叠区里）独立三按钮：
+  - **查看 Diff**：调 `GET /api/rules/diff?projectId=<id>&agent=<agent>`，复用 `planRuleSync`。
+  - **拉取 ↓**：调 `POST /api/projects/<id>/rules/sync { agent, mode: 'pull' }`，从项目覆写本地模板；带 `window.confirm` 二次确认。
+  - **推送 ↑**：根据 `status` 自适应 `mode`：`conflict → overwrite`，否则 `block`。
+- 不引入用户级 Rule 概念；不修改 D8 §2.1–§2.4 的核心 plan/apply/template/loader。
+- 涉及文件：
+  - 新增 `src/server/routes/rules.ts`（`rulesRouter`），挂到 `app.use('/api/rules', ...)`。
+  - 新增 `web/src/pages/RulesPage.tsx`。
+  - 修改 `src/server/app.ts`、`web/src/App.tsx`。
+
+#### 3e.1 三个按钮的功能语义（查看 Diff / 拉取 ↓ / 推送 ↑）
+
+三个按钮都围绕**本地权威模板**与**项目级规则文件**之间双向流动。下表中"模板"= `library/rules/<agent>/<file>`，"项目文件" = `<project.path>/<fileName>`（例如 `<project>/CLAUDE.md`）。
+
+| 按钮 | 后端调用 | 模式 (`mode`) | 行为 | 数据流向 | 触发条件 / 限制 |
+| --- | --- | --- | --- | --- | --- |
+| **查看 Diff** | `GET /api/rules/diff?projectId=<id>&agent=<agent>` | — | 读取模板与项目文件，按 `planRuleSync` 生成 Unified Diff；返回 `{ status, currentContent, templateContent, expectedContent, patch }`。**不写任何文件**，纯展示。 | — | 无副作用，可随时调用 |
+| **推送 ↑** | `POST /api/projects/<id>/rules/sync { agent, mode }` | 自适应 | 用模板**写入**项目文件。`mode` 根据 Diff 状态自动选择：`status === 'conflict' → overwrite`，否则 `block`。 | 模板 → 项目文件 | 同步前自动备份；`overwrite` 会覆盖已有内容；`block` 优先更新托管块，缺失则追加 |
+| **拉取 ↓** | `POST /api/projects/<id>/rules/sync { agent, mode: 'pull' }` | `pull` | 把项目文件中的**托管块内容**反向写回模板。 | 项目文件 → 模板 | **项目文件必须包含托管块**；否则后端抛错 `Project rules file does not contain a managed block to pull`；执行前会先备份本地模板；前端用 `window.confirm` 做二次确认 |
+
+**`planRuleSync` 返回的 4 种 status 与对应操作**：
+
+| `status` | 触发条件 | 推送按钮行为 | 拉取按钮行为 |
+| --- | --- | --- | --- |
+| `create` | 项目文件不存在 | `block` → 写入全新文件（模板内容 + 末尾换行） | 若项目文件不存在直接报错 |
+| `identical` | 项目文件存在，托管块内容与模板**完全一致** | **推送按钮置灰**（无变更） | 拉取：项目有托管块，可拉回（实际就是同内容覆盖模板） |
+| `block` | 项目文件存在，**含托管块**，但块内文本与模板不一致 | `block` → 只替换块内文本，保留用户块外内容 | 可拉取（拉取的是块内最新文本） |
+| `conflict` | 项目文件存在，**无托管块** | `overwrite` → 完全覆盖项目文件（用户块外内容会丢） | 报错（无法定位哪些是"权威"内容） |
+
+**安全约束**：
+
+- 任何 `overwrite` / `block` 写入项目文件前，自动在 `backups/<backupId>/project/<file>` 下生成快照（`applyRuleSync` → `backupRuleFile`）。
+- `pull` 写入模板前，会先备份模板到 `backups/<backupId>/user/<file>`。
+- 项目级写入强制走 `assertInsideProject(project.path, targetPath)` 和 `assertSafeWritePath(targetPath, config)`，拒绝任何越界。
+- 同步前 UI 必须展示 `status` 与 Diff 文本，避免盲同步。
+
+**与项目空间"AI 规则同步 (D8)" Tab 的关系**：
+
+- Rule 库的按钮调用的是同一套核心（`planRuleSync` / `applyRuleSync`），仅入口不同。
+- 区别在 UI 粒度：项目空间 Tab 聚焦"项目 × 模板"的横向选择；Rule 库聚焦"模板 × 项目"的纵向选择。两个入口**读到的 plan 内容完全一致**，可作为互相校对。
+
+#### 3e.2 项目内跨 Agent 互推
+
+在 §3e.1 的"模板 ↔ 项目"方向之外，再加一条**"项目内文件之间互推"**方向，语义聚焦于**管理员在同一项目内把同一份权威规则铺到三个 Agent 规则文件上**。
+
+- **使用场景**：项目里 `CLAUDE.md` 写得最完整，operator 想把相同内容也放到 `AGENTS.md` 与 `GEMINI.md`；或者反过来，发现 `AGENTS.md` 的某段写法更好，挪到 `CLAUDE.md`。
+- **核心函数**：`src/rules/apply.ts` 新增 `crossSyncRule(projectId, sourceAgent, targetAgent, mode)`，mode ∈ {`'block'`, `'overwrite'`}。
+- **API**：`POST /api/projects/:id/rules/cross-sync`，body `{ sourceAgent, targetAgent, mode }`；`sourceAgent === targetAgent` 时返回 400 `VALIDATION_ERROR`。
+- **模式**：
+  - `block`（推荐）：提取源文件中的 `<sourceAgent>` 托管块内容，重新包成 `<targetAgent>` 托管块，应用到目标文件；目标文件保留块外其它内容。
+  - `overwrite`：源文件**整文件**覆写目标文件（项目级写入安全校验仍走 `assertInsideProject`）。
+- **前置条件**：
+  - 源文件必须存在；
+  - `block` 模式还要求源文件含 `<sourceAgent>` 托管块，否则后端抛错 `crossSyncRule: source file has no managed block for "<sourceAgent>"`；
+  - 写入前自动调 `backupRuleFile(...)` 把目标文件备份到 `backups/<id>/project/<file>`；
+  - 安全校验 `assertInsideProject(project.path, ...)` 同时保护源文件路径与目标文件路径。
+- **UI**：Rule 模板库页底部新增"**项目内跨 Agent 互推**"区块，按已注册项目分组，每个项目一张 `3 × 3` 矩阵表；
+  - 行 = 源 Agent；列 = 目标 Agent；对角线禁用；
+  - 非对角线每格两个按钮：`block` / `overwrite`；
+  - 每次点击都先 `window.confirm` 二次确认，显示源 / 目标 / 模式；
+  - 结果在单元格下方用小字提示（绿色成功 / 红色失败）。
+- **与已有按钮的正交关系**：
+  - §3e.1 的"查看 Diff / 拉取 ↓ / 推送 ↑"走的是模板 ↔ 项目方向；
+  - 本节"互推"走的是**项目内文件之间**的方向；
+  - 两者调用的是不同的核心函数（`applyRuleSync` vs `crossSyncRule`），互不依赖、互不阻塞。
+- **不引入 Watch**：`crossSyncRule` 只在用户主动点击按钮时触发；不监听项目目录变化、不自动 plan、不自动 push。
 
 ### 4. 项目工作区管理模块
 
@@ -812,10 +939,10 @@ Gemini 项目规则文件：
 
 ### M5：Antigravity 与 Watch Mode
 
-- 完成 Antigravity 插件目录写入。
-- 自动生成 `plugin.json`。
-- 验证 Antigravity 是否能加载同步后的 Skill。
-- 完成 Watch Mode，默认仅对用户主动开启的 Skill 生效。
+- 完成 Antigravity 用户级写入（按官方约定 `~/.gemini/config/skills/<skill-name>`）。
+- **首版不再自动生成 `plugin.json`**（已与官方约定对齐，旧插件路径 `~/.gemini/antigravity-ide/plugins/...` 已废弃）。
+- 验证 Antigravity 加载状态；UI 显示三态（已写入 / 加载未验证 / 未配置）。
+- 完成 Skill Watch Mode + Rule 跨 Agent 变化检测；详见 `4、计划/D9监听与Antigravity验证开发计划.md`。
 
 ## 首版验收标准
 

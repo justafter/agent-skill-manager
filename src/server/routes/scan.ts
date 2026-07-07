@@ -3,6 +3,7 @@ import { loadConfig } from '../../core/config.js'
 import { loadRegistry } from '../../core/registry.js'
 import { createAdapters } from '../../adapters/registry.js'
 import { identifySkillState } from '../../adapters/scan.js'
+import { scanDevelopmentSkills } from '../../core/development-scan.js'
 import { pathExists } from '../../utils/fs.js'
 import type { TargetKey, AgentId } from '../../types/adapter.js'
 
@@ -21,6 +22,7 @@ export function scanRouter(): Router {
 
       const results: Record<TargetKey, Record<string, string>> = {} as any
       const untracked: Record<TargetKey, string[]> = {} as any
+      const development = await scanDevelopmentSkills(skills)
 
       for (const agent of enabledAgents) {
         const adapter = adapters[agent]
@@ -49,7 +51,7 @@ export function scanRouter(): Router {
         }
       }
 
-      res.json({ results, untracked })
+      res.json({ results, untracked, development })
     } catch (error) {
       next(error)
     }

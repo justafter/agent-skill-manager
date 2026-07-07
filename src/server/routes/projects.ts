@@ -8,7 +8,19 @@ import { pathExists } from '../../utils/fs.js'
 import type { AgentId } from '../../types/adapter.js'
 import { AppError } from '../../utils/errors.js'
 import { planRuleSync } from '../../rules/plan.js'
-import { applyRuleSync } from '../../rules/apply.js'
+import { applyRuleSync, crossSyncRule } from '../../rules/apply.js'
+
+function resolveRuleTemplateDir(config: { ruleTemplateDir: string; workspaceRoot?: string }): string {
+  const raw = config.ruleTemplateDir
+  if (!raw) {
+    throw new AppError(
+      'CONFIG_MISSING',
+      'ruleTemplateDir is not configured. Set it via UI / POST /api/config/rule-template-dir ' +
+        'or in ~/.skill-manager/config.json before using Rule operations.'
+    )
+  }
+  return path.isAbsolute(raw) ? raw : path.resolve(config.workspaceRoot || process.cwd(), raw)
+}
 
 export function projectsRouter(): Router {
   const router = Router()
@@ -67,18 +79,18 @@ export function projectsRouter(): Router {
       // Detect agent directories
       const detectedAgents: AgentId[] = []
       // Note: gemini shares `.agents` with codex at the project level,
-      // so we dedupe via a Set keyed on the detected folder.
+      // so we dedupe by agent (each agent appears at most once).
       const agentsToCheck: { agent: AgentId; folder: string }[] = [
         { agent: 'claude', folder: '.claude' },
         { agent: 'codex', folder: '.agents' },
         { agent: 'gemini', folder: '.agents' }
       ]
-      const detectedFolders = new Set<string>()
+      const detectedAgentsSet = new Set<AgentId>()
       for (const check of agentsToCheck) {
-        if (detectedFolders.has(check.folder)) continue
+        if (detectedAgentsSet.has(check.agent)) continue
         if (await pathExists(path.join(absPath, check.folder))) {
           detectedAgents.push(check.agent)
-          detectedFolders.add(check.folder)
+          detectedAgentsSet.add(check.agent)
         }
       }
 
@@ -170,7 +182,8 @@ export function projectsRouter(): Router {
         throw new AppError('NOT_FOUND', `Project not found: ${id}`)
       }
 
-      const planResult = await planRuleSync(p, agent as AgentId)
+      const templateDir = resolveRuleTemplateDir(config)
+      const planResult = await planRuleSync(p, agent as AgentId, undefined, templateDir)
       res.json(planResult)
     } catch (error) {
       next(error)
@@ -187,7 +200,27 @@ export function projectsRouter(): Router {
         throw new AppError('VALIDATION_ERROR', 'agent and mode are required.')
       }
 
-      await applyRuleSync(id, agent as AgentId, mode as any)
+      await applyRuleSync(id, agent as AgentId, mode as any, undefined, resolveRuleTemplateDir(await loadConfig()))
+      res.json({ success: true })
+    } catch (error) {
+      next(error)
+    }
+  })
+
+  // 7. POST /api/projects/:id/rules/cross-sync - Cross-agent rule sync inside a project
+  router.post('/:id/rules/cross-sync', async (req, res, next) => {
+    try {
+      const { id } = req.params
+      const { sourceAgent, targetAgent, mode } = req.body
+
+      if (!sourceAgent || !targetAgent || !mode) {
+        throw new AppError('VALIDATION_ERROR', 'sourceAgent, targetAgent and mode are required.')
+      }
+      if (sourceAgent === targetAgent) {
+        throw new AppError('VALIDATION_ERROR', 'sourceAgent and targetAgent must differ.')
+      }
+
+      await crossSyncRule(id, sourceAgent as AgentId, targetAgent as AgentId, mode)
       res.json({ success: true })
     } catch (error) {
       next(error)

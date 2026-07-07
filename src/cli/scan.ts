@@ -3,6 +3,7 @@ import { loadConfig } from '../core/config.js'
 import { loadRegistry } from '../core/registry.js'
 import { createAdapters } from '../adapters/registry.js'
 import { identifySkillState } from '../adapters/scan.js'
+import { scanDevelopmentSkills } from '../core/development-scan.js'
 import { pathExists } from '../utils/fs.js'
 import type { TargetKey, AgentId } from '../types/adapter.js'
 
@@ -29,6 +30,7 @@ export function registerScanCommand(program: Command): void {
         const scannedTargets = {} as Record<TargetKey, any>
         const untracked = {} as Record<TargetKey, string[]>
         const detectedTargets = {} as Record<TargetKey, boolean>
+        const development = await scanDevelopmentSkills(skills)
 
         for (const agent of enabledAgents) {
           const adapter = adapters[agent]
@@ -61,6 +63,15 @@ export function registerScanCommand(program: Command): void {
         } else {
           for (const skill of skills) {
             console.log(`Skill: ${skill.name} (${skill.version})`)
+            const dev = development[skill.name]
+            if (dev) {
+              const devMessage =
+                dev.status === 'identical' ? 'identical' :
+                dev.status === 'changed' ? `changed (checksum: ${dev.checksum?.slice(0, 19)}...)` :
+                dev.status === 'missing' ? 'missing' :
+                `invalid (${dev.error})`
+              console.log(`  - development: ${devMessage}`)
+            }
             for (const agent of enabledAgents) {
               const targetKey: TargetKey = `${agent}:user`
               if (!detectedTargets[targetKey]) {

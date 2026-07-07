@@ -1,7 +1,7 @@
 import { NavLink, Route, Routes } from 'react-router-dom'
 import { BackupPage } from './pages/BackupPage'
-import { ImportPage } from './pages/ImportPage'
 import { ProjectSpacePage } from './pages/ProjectSpacePage'
+import { RulesPage } from './pages/RulesPage'
 import { SkillsPage } from './pages/SkillsPage'
 
 export function App() {
@@ -14,16 +14,16 @@ export function App() {
         </div>
         <nav className="app-nav">
           <NavLink to="/">Skill 列表</NavLink>
+          <NavLink to="/rules">Rule 模板库</NavLink>
           <NavLink to="/projects">项目空间</NavLink>
-          <NavLink to="/import">导入技能</NavLink>
           <NavLink to="/backups">备份管理</NavLink>
         </nav>
       </header>
 
       <Routes>
         <Route path="/" element={<SkillsPage />} />
+        <Route path="/rules" element={<RulesPage />} />
         <Route path="/projects" element={<ProjectSpacePage />} />
-        <Route path="/import" element={<ImportPage />} />
         <Route path="/backups" element={<BackupPage />} />
       </Routes>
     </main>

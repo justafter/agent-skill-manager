@@ -27,13 +27,15 @@ export interface RuleSyncPlan {
 export async function planRuleSync(
   project: Project,
   agent: AgentId,
-  root = process.cwd()
+  root = process.cwd(),
+  templateDir?: string
 ): Promise<RuleSyncPlan> {
   const fileName = ruleFileByAgent[agent]
   const targetPath = path.join(project.path, fileName)
 
-  // Load local rule template from root/library/rules
-  const template = await loadRuleTemplate(path.join(root, 'library', 'rules'), agent)
+  // Load local rule template from <templateDir> or fall back to <root>/library/rules
+  const dir = templateDir || path.join(root, 'library', 'rules')
+  const template = await loadRuleTemplate(dir, agent)
   const templateContent = template.content.trim()
 
   let currentContent = ''

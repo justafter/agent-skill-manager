@@ -7,6 +7,8 @@ import { loadConfig } from '../../src/core/config.js'
 import { loadRegistry, saveRegistry } from '../../src/core/registry.js'
 import { createAdapters } from '../../src/adapters/registry.js'
 import { identifySkillState } from '../../src/adapters/scan.js'
+import { scanDevelopmentSkill } from '../../src/core/development-scan.js'
+import { importSkill } from '../../src/core/import.js'
 import { diffDirectories } from '../../src/rules/diff.js'
 import { writeDeployTag } from '../../src/sync/deploy-tag.js'
 import { pathExists } from '../../src/utils/fs.js'
@@ -187,6 +189,37 @@ describe('D2 User-level Scan, List & Diff', () => {
     
     const registry = await loadRegistry(tempWorkspace)
     assert.ok(!registry.skills[untrackedSkillName])
+  })
+
+  it('detects changed development localPath and clears it after re-import', async () => {
+    const skillName = 'dev-drift-skill'
+    const skillSourcePath = path.join(tempWorkspace, skillName)
+    await mkdir(skillSourcePath, { recursive: true })
+    await writeFile(
+      path.join(skillSourcePath, 'SKILL.md'),
+      '---\nname: dev-drift-skill\nversion: 1.0.0\ndescription: dev drift\n---\n'
+    )
+
+    const imported = await importSkill(skillSourcePath, {}, tempWorkspace)
+    assert.equal(imported.status, 'imported')
+
+    let registry = await loadRegistry(tempWorkspace)
+    let devState = await scanDevelopmentSkill(registry.skills[skillName])
+    assert.equal(devState.status, 'identical')
+
+    await writeFile(
+      path.join(skillSourcePath, 'SKILL.md'),
+      '---\nname: dev-drift-skill\nversion: 1.0.1\ndescription: dev drift changed\n---\n'
+    )
+
+    registry = await loadRegistry(tempWorkspace)
+    devState = await scanDevelopmentSkill(registry.skills[skillName])
+    assert.equal(devState.status, 'changed')
+
+    await importSkill(skillSourcePath, { force: true }, tempWorkspace)
+    registry = await loadRegistry(tempWorkspace)
+    devState = await scanDevelopmentSkill(registry.skills[skillName])
+    assert.equal(devState.status, 'identical')
   })
 
   it('diffs directories correctly for added, removed and changed files', async () => {

@@ -3,6 +3,7 @@ import { loadConfig } from '../../core/config.js'
 import { loadRegistry } from '../../core/registry.js'
 import { createAdapters } from '../../adapters/registry.js'
 import { identifySkillState } from '../../adapters/scan.js'
+import { scanDevelopmentSkills } from '../../core/development-scan.js'
 import { pathExists } from '../../utils/fs.js'
 import type { TargetKey, AgentId } from '../../types/adapter.js'
 
@@ -21,7 +22,16 @@ export function skillsRouter(): Router {
       )
 
       const untracked: Record<TargetKey, { name: string; path: string }[]> = {} as any
-      const skillsMap = new Map<string, any>(skills.map(s => [s.name, { ...s, targets: {} }]))
+      const development = await scanDevelopmentSkills(skills)
+      const skillsMap = new Map<string, any>(skills.map(s => [
+        s.name,
+        {
+          ...s,
+          development: development[s.name],
+          targets: {} as Record<TargetKey, string>,
+          installedPaths: {} as Record<TargetKey, string>
+        }
+      ]))
 
       for (const agent of enabledAgents) {
         const adapter = adapters[agent]
@@ -33,10 +43,13 @@ export function skillsRouter(): Router {
 
         if (detected) {
           const targetSkills = await adapter.scanUserSkills()
-          
+
           for (const [name, skillObj] of skillsMap.entries()) {
             const targetSkillInfo = targetSkills[name]
             skillObj.targets[targetKey] = identifySkillState(skillObj, targetSkillInfo)
+            if (targetSkillInfo && targetSkillInfo.localPath) {
+              skillObj.installedPaths[targetKey] = targetSkillInfo.localPath
+            }
           }
 
           untracked[targetKey] = Object.values(targetSkills)
@@ -49,7 +62,31 @@ export function skillsRouter(): Router {
         }
       }
 
-      res.json({ skills: Array.from(skillsMap.values()), untracked })
+      // Resolve project-level installed paths using registry.projectInstalls
+      // (target => agent:project, project path comes from registered projects).
+      const projectById = new Map<string, { path: string; projectSkillPath: string }>()
+      for (const p of (config.projects as any[]) || []) {
+        projectById.set(p.id, p)
+      }
+      for (const skillObj of skillsMap.values()) {
+        for (const install of (skillObj.projectInstalls || []) as Array<{
+          projectId: string
+          target: TargetKey
+        }>) {
+          if (!install.target.endsWith(':project')) continue
+          const agent = install.target.split(':')[0] as AgentId
+          const adapter = adapters[agent]
+          if (!adapter) continue
+          const proj = projectById.get(install.projectId)
+          const projectSkillBase = adapter.getTargetPaths().projectSkillPath
+          if (proj && projectSkillBase) {
+            const base = `${proj.path.replace(/\\/g, '/')}/${projectSkillBase.replace(/^\.\//, '')}`.replace(/\/$/, '')
+            skillObj.installedPaths[install.target] = `${base}/${skillObj.name}`
+          }
+        }
+      }
+
+      res.json({ skills: Array.from(skillsMap.values()), untracked, development })
     } catch (error) {
       next(error)
     }

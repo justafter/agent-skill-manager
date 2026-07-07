@@ -6,10 +6,13 @@ import { healthRouter } from './routes/health.js'
 import { importRouter } from './routes/import.js'
 import { projectsRouter } from './routes/projects.js'
 import { restoreRouter } from './routes/restore.js'
+import { ruleTemplateDirRouter } from './routes/rule-template-dir.js'
+import { rulesRouter } from './routes/rules.js'
 import { scanRouter } from './routes/scan.js'
 import { skillsRouter } from './routes/skills.js'
 import { syncRouter } from './routes/sync.js'
 import { watchRouter } from './routes/watch.js'
+import { rulesWatchRouter } from './routes/rules-watch.js'
 import { errorHandler } from './middleware/errors.js'
 
 export function createApp(): express.Express {
@@ -25,6 +28,9 @@ export function createApp(): express.Express {
   app.use('/api/diff', diffRouter())
   app.use('/api/backups', backupRouter())
   app.use('/api/restore', restoreRouter())
+  app.use('/api/rules', rulesRouter())
+  app.use('/api/config/rule-template-dir', ruleTemplateDirRouter())
+  app.use('/api/rules/watch', rulesWatchRouter())
   app.use('/api/watch', watchRouter())
   app.use('/api/projects', projectsRouter())
 

@@ -2,14 +2,45 @@ import { useState } from 'react'
 import { useApi } from '../hooks/useApi'
 import { SkillCard } from '../components/SkillCard'
 import { PlanConfirmDialog, PlanResult } from '../components/PlanConfirmDialog'
+import { DirectoryPicker } from '../components/DirectoryPicker'
 import { apiPost } from '../api/client'
 
 export function SkillsPage() {
   const { data: config } = useApi<any>('config', '/api/config')
   const { data: skillsData, refetch, isLoading } = useApi<any>('skills', '/api/skills')
+  const { data: watchData, refetch: refetchWatches } = useApi<any>('watches', '/api/watch/status')
 
   const [activeTab, setActiveTab] = useState<string>('all')
   const [isScanning, setIsScanning] = useState(false)
+  const [refreshingSkillName, setRefreshingSkillName] = useState<string | null>(null)
+
+  const handleToggleWatch = async (skillName: string, enabled: boolean) => {
+    try {
+      if (enabled) {
+        await apiPost('/api/watch/start', { skillName })
+      } else {
+        await apiPost('/api/watch/stop', { skillName })
+      }
+      await refetchWatches()
+    } catch (err) {
+      alert(`切换监听模式失败: ${(err as Error).message}`)
+    }
+  }
+
+  const watches = watchData?.watches || []
+  const getWatchState = (skillName: string) => {
+    return watches.find((w: any) => w.skillName === skillName) || null
+  }
+
+  // Import-by-path dialog state (replaces the standalone /import page)
+  const [importDialogOpen, setImportDialogOpen] = useState(false)
+  const [importPath, setImportPath] = useState('')
+  const [importForce, setImportForce] = useState(false)
+  const [importSkip, setImportSkip] = useState(false)
+  const [isImporting, setIsImporting] = useState(false)
+  const [importFeedback, setImportFeedback] = useState<
+    { type: 'success' | 'error'; message: string } | null
+  >(null)
 
   // Sync state
   const [planDialogOpen, setPlanDialogOpen] = useState(false)
@@ -104,6 +135,72 @@ export function SkillsPage() {
     }
   }
 
+  const handleRefreshFromLocal = async (skill: any) => {
+    if (!skill.localPath) return
+    const confirmed = window.confirm(
+      `确定要用导入目录中的最新内容更新本地库吗？\n\n${skill.localPath}`
+    )
+    if (!confirmed) return
+
+    try {
+      setRefreshingSkillName(skill.name)
+      await apiPost('/api/import', {
+        path: skill.localPath,
+        force: true,
+        skip: false
+      })
+      await refetch()
+    } catch (err) {
+      alert(`更新本地库失败: ${(err as Error).message}`)
+    } finally {
+      setRefreshingSkillName(null)
+    }
+  }
+
+  const handleImportByPath = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!importPath.trim()) return
+    try {
+      setIsImporting(true)
+      setImportFeedback(null)
+      const res = await apiPost<any>('/api/import', {
+        path: importPath.trim(),
+        force: importForce,
+        skip: importSkip
+      })
+      setImportFeedback(
+        res.skipped
+          ? {
+              type: 'success',
+              message: `[跳过] 由于已存在相同校验和的 Skill，跳过导入 "${res.skill.name}"。`
+            }
+          : {
+              type: 'success',
+              message: `[成功] Skill "${res.skill.name}" (v${res.skill.version}) 已成功导入到本地库！`
+            }
+      )
+      setImportPath('')
+      setImportForce(false)
+      setImportSkip(false)
+      await refetch()
+    } catch (err) {
+      setImportFeedback({
+        type: 'error',
+        message: `导入失败: ${(err as Error).message}`
+      })
+    } finally {
+      setIsImporting(false)
+    }
+  }
+
+  const closeImportDialog = () => {
+    setImportDialogOpen(false)
+    setImportFeedback(null)
+    setImportPath('')
+    setImportForce(false)
+    setImportSkip(false)
+  }
+
   if (isLoading || !config || !skillsData) {
     return <div className="page"><div className="empty-state">正在加载 Skill...</div></div>
   }
@@ -133,14 +230,23 @@ export function SkillsPage() {
     <section className="page">
       <div className="toolbar">
         <h2>Skill 库</h2>
-        <button
-          className="button button-primary"
-          type="button"
-          onClick={handleScan}
-          disabled={isScanning}
-        >
-          {isScanning ? '正在扫描...' : '扫描目标目录'}
-        </button>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            className="button"
+            type="button"
+            onClick={() => setImportDialogOpen(true)}
+          >
+            导入技能
+          </button>
+          <button
+            className="button button-primary"
+            type="button"
+            onClick={handleScan}
+            disabled={isScanning}
+          >
+            {isScanning ? '正在扫描...' : '扫描目标目录'}
+          </button>
+        </div>
       </div>
 
       <div className="filter-bar">
@@ -181,11 +287,18 @@ export function SkillsPage() {
               description={skill.description}
               version={skill.version}
               checksum={skill.checksum}
+              localPath={skill.localPath}
+              development={skill.development}
               targets={skill.targets || {}}
               syncedTargets={skill.syncedTargets || []}
               projectInstalls={skill.projectInstalls || []}
+              installedPaths={skill.installedPaths || {}}
               enabledTargets={enabledTargets}
               onPlanSync={(to, from) => triggerPlan(skill.name, to, from, allowManagedModify)}
+              onRefreshFromLocal={() => handleRefreshFromLocal(skill)}
+              isRefreshingFromLocal={refreshingSkillName === skill.name}
+              watchState={getWatchState(skill.name)}
+              onToggleWatch={(enabled: boolean) => handleToggleWatch(skill.name, enabled)}
             />
           ))}
         </div>
@@ -250,6 +363,139 @@ export function SkillsPage() {
           </div>
         )
       })()}
+
+      {importDialogOpen && (
+        <div className="modal-overlay" onClick={closeImportDialog}>
+          <div
+            className="modal-content"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: '560px', width: '90%' }}
+          >
+            <form onSubmit={handleImportByPath}>
+              <div className="modal-header">
+                <span>导入 Skill 到本地库</span>
+                <button
+                  type="button"
+                  className="button"
+                  style={{ padding: '4px 8px' }}
+                  onClick={closeImportDialog}
+                  disabled={isImporting}
+                >
+                  &times;
+                </button>
+              </div>
+
+              <div className="modal-body">
+                <p style={{ color: '#57606a', fontSize: '13px', marginBottom: '16px' }}>
+                  请输入要导入的 Skill 绝对目录路径。管理器会在写入本地库前校验其
+                  <code style={{ background: '#f1f5f9', padding: '0 4px', borderRadius: '3px', margin: '0 4px' }}>SKILL.md</code>
+                  的 Frontmatter 元数据。
+                </p>
+
+                <div className="form-group">
+                  <label htmlFor="import-path">源目录路径（绝对路径）</label>
+                  <DirectoryPicker
+                    id="import-path"
+                    value={importPath}
+                    onChange={(v) => {
+                      setImportPath(v)
+                      setImportFeedback(null)
+                    }}
+                    placeholder="例如：D:\MySkills\my-new-skill"
+                    disabled={isImporting}
+                    hint="支持手动输入，或点击右侧 “选择目录…” 按钮（仅 Chromium 系列浏览器可返回绝对路径）。"
+                  />
+                </div>
+
+                <div
+                  className="form-group"
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px',
+                    marginTop: '12px'
+                  }}
+                >
+                  <label
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      cursor: 'pointer',
+                      margin: 0,
+                      fontWeight: 500
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={importForce}
+                      onChange={(e) => setImportForce(e.target.checked)}
+                      disabled={isImporting}
+                    />
+                    <span>强制覆写（覆盖前会创建注册表与本地备份）</span>
+                  </label>
+
+                  <label
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      cursor: 'pointer',
+                      margin: 0,
+                      fontWeight: 500
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={importSkip}
+                      onChange={(e) => setImportSkip(e.target.checked)}
+                      disabled={isImporting}
+                    />
+                    <span>如果校验和一致则跳过</span>
+                  </label>
+                </div>
+
+                {importFeedback && (
+                  <div
+                    className="empty-state"
+                    style={{
+                      marginTop: '16px',
+                      padding: '12px',
+                      fontSize: '13px',
+                      background: importFeedback.type === 'success' ? '#dafbe1' : '#ffebe9',
+                      color: importFeedback.type === 'success' ? '#1a7f37' : '#cf222e',
+                      border:
+                        importFeedback.type === 'success'
+                          ? '1px solid #c4f2d2'
+                          : '1px solid #ffc8c4'
+                    }}
+                  >
+                    {importFeedback.message}
+                  </div>
+                )}
+              </div>
+
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="button"
+                  onClick={closeImportDialog}
+                  disabled={isImporting}
+                >
+                  取消
+                </button>
+                <button
+                  type="submit"
+                  className="button button-primary"
+                  disabled={isImporting || !importPath.trim()}
+                >
+                  {isImporting ? '正在导入...' : '导入 Skill'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       <PlanConfirmDialog
         open={planDialogOpen}
