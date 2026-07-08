@@ -10,3 +10,5 @@ backups/*
 library/skills/*
 !library/skills/.gitkeep
 *.tsbuildinfo
+.claude/settings.local.json
+.claude/launch.json
