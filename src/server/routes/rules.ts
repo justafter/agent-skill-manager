@@ -58,7 +58,7 @@ export function rulesRouter(): Router {
           const installedPaths = []
           for (const p of projects) {
             const projectTemplate = p.ruleTemplates?.[agent]
-            const isBound = projectTemplate === fileName || (!projectTemplate && fileName === defaultFileName)
+            const isBound = projectTemplate === fileName
 
             if (isBound) {
               const projectRulePath = path.join(p.path, defaultFileName)

@@ -1,6 +1,18 @@
 import { useState } from 'react'
 import { useApi } from '../hooks/useApi'
-import { apiPost } from '../api/client'
+import { apiPost, apiDelete } from '../api/client'
+
+function formatBytes(n: number): string {
+  if (!Number.isFinite(n) || n <= 0) return '0 B'
+  const units = ['B', 'KB', 'MB', 'GB']
+  let i = 0
+  let v = n
+  while (v >= 1024 && i < units.length - 1) {
+    v /= 1024
+    i++
+  }
+  return `${v.toFixed(v >= 10 || i === 0 ? 0 : 1)} ${units[i]}`
+}
 
 export function BackupPage() {
   const { data, refetch, isLoading } = useApi<any>('backups', '/api/backups')
@@ -43,6 +55,33 @@ export function BackupPage() {
     }
   }
 
+  const handleDelete = async (bk: any) => {
+    const itemCount = bk.items?.length ?? 0
+    const ok = window.confirm(
+      `警告：您确定要永久删除备份 [${bk.backupId}] 吗？\n\n` +
+        `该备份包含 ${itemCount} 个项目，创建于 ${new Date(bk.createdAt).toLocaleString()}。\n` +
+        `此操作不可撤销，删除后无法再恢复该备份。`,
+    )
+    if (!ok) return
+
+    try {
+      setIsSubmitting(true)
+      const res = await apiDelete<{ success: boolean; backupId: string; removedItems: number; removedBytes: number }>(
+        `/api/backups/${encodeURIComponent(bk.backupId)}`,
+      )
+      alert(
+        `[成功] 已删除备份 ${res.backupId}。\n` +
+          `释放项目: ${res.removedItems} 个\n` +
+          `释放空间: ${formatBytes(res.removedBytes)}`,
+      )
+      await refetch()
+    } catch (err) {
+      alert(`删除失败: ${(err as Error).message}`)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="page">
@@ -57,13 +96,21 @@ export function BackupPage() {
     <section className="page" style={{ maxWidth: '900px', margin: '0 auto' }}>
       <div className="toolbar" style={{ marginBottom: '24px' }}>
         <h2>备份与恢复归档</h2>
-        <button
-          className="button button-primary"
-          onClick={() => setShowCreateForm(!showCreateForm)}
-          disabled={isSubmitting}
-        >
-          {showCreateForm ? '取消' : '创建快照备份'}
-        </button>
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <span style={{ color: '#64748b', fontSize: '13px' }}>
+            备份目录:{' '}
+            <code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '3px', fontFamily: 'monospace', wordBreak: 'break-all' }}>
+              {data?.backupDir || '(未配置)'}
+            </code>
+          </span>
+          <button
+            className="button button-primary"
+            onClick={() => setShowCreateForm(!showCreateForm)}
+            disabled={isSubmitting}
+          >
+            {showCreateForm ? '取消' : '创建快照备份'}
+          </button>
+        </div>
       </div>
 
       {showCreateForm && (
@@ -135,14 +182,30 @@ export function BackupPage() {
                     创建时间: {new Date(bk.createdAt).toLocaleString()}
                   </div>
                 </div>
-                <button
-                  className="button button-danger"
-                  style={{ padding: '6px 14px', fontSize: '13px' }}
-                  onClick={() => handleRestore(bk.backupId)}
-                  disabled={isSubmitting}
-                >
-                  恢复此备份
-                </button>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    className="button"
+                    style={{
+                      border: '1px solid #fecaca',
+                      color: '#b91c1c',
+                      background: '#fef2f2',
+                      padding: '6px 14px',
+                      fontSize: '13px',
+                    }}
+                    onClick={() => handleDelete(bk)}
+                    disabled={isSubmitting}
+                  >
+                    删除备份
+                  </button>
+                  <button
+                    className="button button-primary"
+                    style={{ padding: '6px 14px', fontSize: '13px' }}
+                    onClick={() => handleRestore(bk.backupId)}
+                    disabled={isSubmitting}
+                  >
+                    恢复此备份
+                  </button>
+                </div>
               </div>
 
               <div style={{ fontSize: '14px', color: '#354557', marginBottom: '12px' }}>
@@ -166,20 +229,33 @@ export function BackupPage() {
                       key={idx}
                       style={{
                         display: 'flex',
-                        justifyContent: 'space-between',
-                        padding: '4px 0',
-                        fontSize: '12px',
+                        flexDirection: 'column',
+                        padding: '6px 0',
                         borderBottom: idx < bk.items.length - 1 ? '1px solid #f1f5f9' : 'none',
                       }}
                     >
-                      <span style={{ color: '#0969da', fontWeight: 500 }}>
-                        {item.skillName
-                          ? `Skill: ${item.skillName}`
-                          : item.type === 'registry'
-                            ? '注册表快照'
-                            : '全局 Skill 库'}
-                      </span>
-                      <span style={{ color: '#57606a', fontFamily: 'monospace' }}>{item.type}</span>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
+                        <span style={{ color: '#0969da', fontWeight: 500, fontSize: '12px' }}>
+                          {item.skillName
+                            ? `Skill: ${item.skillName}`
+                            : item.type === 'registry'
+                              ? '注册表快照'
+                              : '全局 Skill 库'}
+                        </span>
+                        <span style={{ color: '#57606a', fontFamily: 'monospace', fontSize: '11px', background: '#eaeef2', padding: '1px 6px', borderRadius: '3px' }}>
+                          {item.type}
+                        </span>
+                      </div>
+                      {item.originalPath && (
+                        <div style={{ color: '#64748b', fontSize: '11px', fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                          原路径: {item.originalPath}
+                        </div>
+                      )}
+                      {item.backupPath && (
+                        <div style={{ color: '#64748b', fontSize: '11px', fontFamily: 'monospace', wordBreak: 'break-all', marginTop: '2px' }}>
+                          备份路径: {item.backupPath}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

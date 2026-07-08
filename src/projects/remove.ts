@@ -128,10 +128,7 @@ export async function buildRemovePreview(project: Project): Promise<RemovePrevie
  * - `CONFIG_SAVE_FAILED` if the new config cannot be written (propagated
  *   from `saveConfig`; snapshot path included in details for recovery).
  */
-export async function removeProject(
-  projectId: string,
-  confirmed: boolean,
-): Promise<RemoveProjectResult> {
+export async function removeProject(projectId: string, confirmed: boolean): Promise<RemoveProjectResult> {
   if (confirmed !== true) {
     throw new AppError('CONFIRMATION_REQUIRED', 'Removal requires explicit confirmation (confirmed=true).', {
       projectId,
@@ -192,11 +189,10 @@ async function snapshotUserConfig(prefix: string): Promise<string> {
   try {
     await ensureDir(snapshotDir)
   } catch (error) {
-    throw new AppError(
-      'CONFIG_SNAPSHOT_FAILED',
-      `Failed to prepare snapshot directory: ${(error as Error).message}`,
-      { snapshotDir, originalError: error },
-    )
+    throw new AppError('CONFIG_SNAPSHOT_FAILED', `Failed to prepare snapshot directory: ${(error as Error).message}`, {
+      snapshotDir,
+      originalError: error,
+    })
   }
 
   const ts = new Date().toISOString().replace(/:/g, '-')
@@ -219,11 +215,11 @@ async function snapshotUserConfig(prefix: string): Promise<string> {
   try {
     await copyFile(configPath, snapshotPath)
   } catch (error) {
-    throw new AppError(
-      'CONFIG_SNAPSHOT_FAILED',
-      `Failed to snapshot config.json: ${(error as Error).message}`,
-      { snapshotPath, sourcePath: configPath, originalError: error },
-    )
+    throw new AppError('CONFIG_SNAPSHOT_FAILED', `Failed to snapshot config.json: ${(error as Error).message}`, {
+      snapshotPath,
+      sourcePath: configPath,
+      originalError: error,
+    })
   }
 
   return snapshotPath

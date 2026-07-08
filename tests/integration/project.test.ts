@@ -42,10 +42,7 @@ describe('D7 Project Workspaces', () => {
 
     userConfigPath = path.join(tempWorkspace, '.skill-manager', 'config.json')
 
-    await writeFile(
-      path.join(tempWorkspace, 'skill-manager.config.json'),
-      JSON.stringify(BASE_CONFIG, null, 2),
-    )
+    await writeFile(path.join(tempWorkspace, 'skill-manager.config.json'), JSON.stringify(BASE_CONFIG, null, 2))
   })
 
   after(async () => {

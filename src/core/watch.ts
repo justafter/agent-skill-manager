@@ -208,6 +208,9 @@ export async function runRuleScan(root = process.cwd()) {
       if (project.enabledAgents && !project.enabledAgents.includes(agent)) {
         continue
       }
+      if (!project.ruleTemplates?.[agent]) {
+        continue
+      }
       try {
         const plan = await planRuleSync(project, agent, root)
         if (plan.status === 'block' || plan.status === 'conflict') {

@@ -302,5 +302,31 @@ export function projectsRouter(): Router {
     }
   })
 
+  // 11. POST /api/projects/:id/scan - Re-scan a single project's directories
+  // (added 2026-07-08 to back the "重新扫描" button in ProjectWorkspacePage).
+  router.post('/:id/scan', async (req, res, next) => {
+    try {
+      const { id } = req.params
+      const config = await loadConfig()
+      const target = (config.projects ?? []).find((p) => p.id === id)
+      if (!target) {
+        throw new AppError('NOT_FOUND', `Project not found: ${id}`)
+      }
+
+      let scan: { projectId: string; skillDirs: string[]; ruleFiles: string[] }
+      try {
+        scan = await scanProject(target)
+      } catch {
+        // Mirror GET /api/projects behaviour: project dir missing / unreadable
+        // → return empty scan instead of 500.
+        scan = { projectId: target.id, skillDirs: [], ruleFiles: [] }
+      }
+
+      res.json({ ...scan, scannedAt: new Date().toISOString() })
+    } catch (error) {
+      next(error)
+    }
+  })
+
   return router
 }

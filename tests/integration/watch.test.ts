@@ -132,6 +132,9 @@ describe('D9 Watch Mode', () => {
       enabledAgents: ['claude'],
       allowProjectSkill: true,
       allowProjectRule: true,
+      ruleTemplates: {
+        claude: 'CLAUDE.md',
+      },
     })
     await writeFile(path.join(tempWorkspace, 'skill-manager.config.json'), JSON.stringify(currentConfig, null, 2))
 

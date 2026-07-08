@@ -45,6 +45,7 @@ const AGENTS: Array<'claude' | 'codex' | 'gemini'> = ['claude', 'codex', 'gemini
 export function RulesPage() {
   const { data: rulesData, refetch, isLoading } = useApi<any>('rules', '/api/rules')
   const { data: tplDir, refetch: refetchTplDir } = useApi<any>('rule-template-dir', '/api/config/rule-template-dir')
+  const { data: projectsData, refetch: refetchProjects } = useApi<any>('projects', '/api/projects')
 
   const [expandedAgents, setExpandedAgents] = useState<Record<string, boolean>>({})
   const [activeProject, setActiveProject] = useState<Record<string, string>>({})
@@ -559,6 +560,110 @@ export function RulesPage() {
         </div>
       )}
 
+      {/* 项目规则绑定管理面板 */}
+      <div
+        style={{
+          background: '#ffffff',
+          border: '1px solid #e2e8f0',
+          borderRadius: '8px',
+          padding: '16px 20px',
+          marginBottom: '24px',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+        }}
+      >
+        <h3 style={{ margin: '0 0 8px 0', fontSize: '15px', color: '#0f172a' }}>项目规则绑定管理</h3>
+        <p style={{ margin: '0 0 16px 0', fontSize: '12px', color: '#64748b' }}>
+          在此将您的项目规则关联到本地模板库中的自定义模板。新导入的项目默认为“未关联”，只有显式关联后系统才会进行比对与同步。
+        </p>
+        {!projectsData ? (
+          <div className="empty-state" style={{ padding: '16px' }}>
+            正在加载项目列表...
+          </div>
+        ) : (projectsData.projects || []).length === 0 ? (
+          <div className="empty-state" style={{ padding: '16px' }}>
+            未注册任何项目。请先前往<b>项目空间</b>页面注册项目。
+          </div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+              <thead>
+                <tr style={{ borderBottom: '2px solid #f1f5f9', textAlign: 'left' }}>
+                  <th style={{ padding: '8px', color: '#475569', fontWeight: 600 }}>项目名称</th>
+                  <th style={{ padding: '8px', color: '#475569', fontWeight: 600 }}>项目路径</th>
+                  <th style={{ padding: '8px', color: '#475569', fontWeight: 600, textAlign: 'center', width: '22%' }}>
+                    Claude 规则关联
+                  </th>
+                  <th style={{ padding: '8px', color: '#475569', fontWeight: 600, textAlign: 'center', width: '22%' }}>
+                    Codex 规则关联
+                  </th>
+                  <th style={{ padding: '8px', color: '#475569', fontWeight: 600, textAlign: 'center', width: '22%' }}>
+                    Gemini 规则关联
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {(projectsData.projects || []).map((p: any) => (
+                  <tr key={p.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                    <td style={{ padding: '8px', fontWeight: 500, color: '#0f172a' }}>{p.name}</td>
+                    <td style={{ padding: '8px', color: '#64748b', fontFamily: 'monospace', fontSize: '11px' }}>
+                      {p.path}
+                    </td>
+                    {['claude', 'codex', 'gemini'].map((agent) => {
+                      const currentTpl = p.ruleTemplates?.[agent] || ''
+                      const agentTemplates = rules.filter((r: any) => r.agent === agent)
+                      return (
+                        <td key={agent} style={{ padding: '8px', textAlign: 'center' }}>
+                          <select
+                            style={{
+                              padding: '4px 8px',
+                              fontSize: '12px',
+                              borderRadius: '6px',
+                              border: '1px solid #cbd5e1',
+                              background: '#ffffff',
+                              cursor: 'pointer',
+                              width: '100%',
+                              maxWidth: '180px',
+                            }}
+                            value={currentTpl}
+                            onChange={async (e) => {
+                              const val = e.target.value
+                              try {
+                                await apiPut(`/api/projects/${p.id}/rules/template`, {
+                                  agent,
+                                  templateName: val || null,
+                                })
+                                await refetch()
+                                await refetchProjects()
+
+                                // Clear cache and reload diff
+                                const k = keyFor(agent, p.id)
+                                setDiffByKey((s) => ({ ...s, [k]: null }))
+                                if (val) {
+                                  await loadDiff(agent, p.id)
+                                }
+                              } catch (err) {
+                                alert(`绑定规则模板失败: ${(err as Error).message}`)
+                              }
+                            }}
+                          >
+                            <option value="">(未关联)</option>
+                            {agentTemplates.map((r: any) => (
+                              <option key={r.name} value={r.name}>
+                                {r.name}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                      )
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
       {rules.length === 0 ? (
         <div className="empty-state">未注册任何 Rule 模板。</div>
       ) : (
@@ -701,18 +806,22 @@ export function RulesPage() {
                                     try {
                                       await apiPut(`/api/projects/${p.projectId}/rules/template`, {
                                         agent: rule.agent,
-                                        templateName: newTplName,
+                                        templateName: newTplName || null,
                                       })
                                       await refetch()
+                                      await refetchProjects()
                                       // Recalculate diff for the new combination
                                       const newKey = keyFor(rule.agent, p.projectId)
                                       setDiffByKey((s) => ({ ...s, [newKey]: null }))
-                                      await loadDiff(rule.agent, p.projectId)
+                                      if (newTplName) {
+                                        await loadDiff(rule.agent, p.projectId)
+                                      }
                                     } catch (err) {
                                       alert(`绑定模板失败: ${(err as Error).message}`)
                                     }
                                   }}
                                 >
+                                  <option value="">(未关联)</option>
                                   {rules
                                     .filter((r: any) => r.agent === rule.agent)
                                     .map((r: any) => (

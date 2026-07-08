@@ -26,25 +26,23 @@ a {
 }
 
 .app-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
   display: flex;
-  align-items: end;
+  align-items: center;
   justify-content: space-between;
   gap: 24px;
-  padding: 24px 32px;
+  padding: 12px 24px;
   border-bottom: 1px solid #d8dee9;
   background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 .app-header h1 {
   margin: 0;
-  font-size: 24px;
+  font-size: 18px;
   font-weight: 700;
-}
-
-.app-header p {
-  margin: 6px 0 0;
-  color: #5d6b7a;
-  font-size: 14px;
 }
 
 .app-nav {

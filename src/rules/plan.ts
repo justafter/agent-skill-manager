@@ -35,6 +35,11 @@ export async function planRuleSync(
   const targetPath = path.join(project.path, fileName)
 
   const configuredTemplateName = project.ruleTemplates?.[agent]
+  if (!configuredTemplateName) {
+    throw new Error(
+      `Project is not associated with any template for agent "${agent}". Please associate a template first.`,
+    )
+  }
 
   // Load local rule template from <templateDir> or fall back to <root>/library/rules
   const dir = templateDir || path.join(root, 'library', 'rules')

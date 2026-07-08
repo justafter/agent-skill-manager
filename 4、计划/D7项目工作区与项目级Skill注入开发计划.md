@@ -13,6 +13,7 @@
 - `src/cli/project.ts` - CLI 中的 `asm project` 命令组实现
 - `src/server/routes/projects.ts` - 本地 HTTP API 路由
 - `web/src/pages/ProjectSpacePage.tsx` - 前端项目空间管理页面；项目卡片支持展开"已安装路径"折叠区（与 D6 §2.8 同源样式：flex 居中、tag 等宽、`flex: 1; min-width: 0`）；"添加项目"对话框使用 `<DirectoryPicker>` 组件；项目卡片/列表新增"移除项目"按钮 + 影响预览确认弹窗
+- `web/src/pages/ProjectWorkspacePage.tsx` - **项目工作区独立详情页（新增，承接 D6 §2.12）**；路由 `/projects/:id`，完全替代 `ProjectSpacePage` 中原"管理工作区"Modal；展示项目基本信息卡 + 项目级 Skill/Rule 状态总览 + 技能注入 + AI 规则同步四块
 - `backups/config-snapshots/` - **新增配置快照备份目录**：存放 `remove-project-<id>-<timestamp>.json`，用于回滚解除注册操作
 
 ---
@@ -107,14 +108,14 @@
 ```ts
 // 仅查询，不修改任何状态。
 export interface RemovePreviewSkillInstall {
-  skill: string                    // skill name
+  skill: string // skill name
   agent: AgentId
-  absolutePath: string             // 解析后的项目级绝对路径
-  exists: boolean                  // pathExists()
+  absolutePath: string // 解析后的项目级绝对路径
+  exists: boolean // pathExists()
 }
 export interface RemovePreviewRuleFile {
   agent: AgentId
-  file: string                     // 'CLAUDE.md' / 'AGENTS.md' / 'GEMINI.md'
+  file: string // 'CLAUDE.md' / 'AGENTS.md' / 'GEMINI.md'
   absolutePath: string
   exists: boolean
 }
@@ -128,13 +129,10 @@ export async function buildRemovePreview(project: Project): Promise<RemovePrevie
 // 应用移除。confirmed 必须为 true，否则直接抛 CONFIRMATION_REQUIRED。
 // 流程：先读 user config.json 备份到 backups/config-snapshots/ → saveConfig 写新配置 → 任意写盘失败回滚。
 export interface RemoveProjectResult {
-  projects: Project[]              // 移除后的列表
-  backupPath: string               // 备份快照路径，供 UI 展示
+  projects: Project[] // 移除后的列表
+  backupPath: string // 备份快照路径，供 UI 展示
 }
-export async function removeProject(
-  projectId: string,
-  confirmed: boolean,
-): Promise<RemoveProjectResult>
+export async function removeProject(projectId: string, confirmed: boolean): Promise<RemoveProjectResult>
 ```
 
 实现要点：
@@ -158,15 +156,15 @@ export async function removeProject(
 
 #### 2.6.2 错误码全表
 
-| 场景 | code | HTTP status | 触发条件 |
-|---|---|---|---|
-| 项目 id 不存在 | `NOT_FOUND` | 404 | `projects.find(p => p.id === id)` 返回 undefined |
-| 未确认影响 | `CONFIRMATION_REQUIRED` | 400 | `confirmed !== true` |
-| 路径校验失败 | `PATH_OUT_OF_BOUNDS` | 403 | 备份目标路径不在 allowlist（不应发生，作为防御） |
-| 快照备份失败 | `CONFIG_SNAPSHOT_FAILED` | 500 | `ensureDir` / `writeFile` 失败（磁盘满 / 权限） |
-| 配置写盘失败 | `CONFIG_SAVE_FAILED` | 500 | `saveConfig` 抛错（沿用 `core/config.ts` 已有定义） |
-| 缺少 project | `VALIDATION_ERROR` | 400 | `projectId` 缺失 / 非字符串 |
-| 内部清理 | `INTERNAL_ERROR` | 500 | 其余未捕获 |
+| 场景           | code                     | HTTP status | 触发条件                                            |
+| -------------- | ------------------------ | ----------- | --------------------------------------------------- |
+| 项目 id 不存在 | `NOT_FOUND`              | 404         | `projects.find(p => p.id === id)` 返回 undefined    |
+| 未确认影响     | `CONFIRMATION_REQUIRED`  | 400         | `confirmed !== true`                                |
+| 路径校验失败   | `PATH_OUT_OF_BOUNDS`     | 403         | 备份目标路径不在 allowlist（不应发生，作为防御）    |
+| 快照备份失败   | `CONFIG_SNAPSHOT_FAILED` | 500         | `ensureDir` / `writeFile` 失败（磁盘满 / 权限）     |
+| 配置写盘失败   | `CONFIG_SAVE_FAILED`     | 500         | `saveConfig` 抛错（沿用 `core/config.ts` 已有定义） |
+| 缺少 project   | `VALIDATION_ERROR`       | 400         | `projectId` 缺失 / 非字符串                         |
+| 内部清理       | `INTERNAL_ERROR`         | 500         | 其余未捕获                                          |
 
 **回滚语义**：
 
@@ -216,8 +214,6 @@ export async function removeProject(
 - 主操作按钮文案：`确认移除`，loading 态 `正在移除...`。
 - 关闭按钮：`取消`。
 - 成功后 toast：`已解除注册，配置备份已保存至 <backupPath>`。
-
-
 
 - 在 `tests/integration/project.test.ts` 中完成：
   - 项目添加、重复添加拒绝、列表读取。

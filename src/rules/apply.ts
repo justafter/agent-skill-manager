@@ -32,7 +32,12 @@ export async function applyRuleSync(
   const targetPath = path.join(project.path, fileName)
 
   const configuredTemplateName = project.ruleTemplates?.[agent]
-  const templateFileName = configuredTemplateName || fileName
+  if (!configuredTemplateName) {
+    throw new Error(
+      `Project is not associated with any template for agent "${agent}". Please associate a template first.`,
+    )
+  }
+  const templateFileName = configuredTemplateName
 
   const dir = templateDir || path.join(root, 'library', 'rules')
   const templatePath = path.join(dir, agent, templateFileName)

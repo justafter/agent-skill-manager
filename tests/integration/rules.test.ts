@@ -53,6 +53,9 @@ describe('D8 Rule Templates Sync', () => {
           enabledAgents: ['claude'],
           allowProjectSkill: true,
           allowProjectRule: true,
+          ruleTemplates: {
+            claude: 'CLAUDE.md',
+          },
         },
       ],
     }
