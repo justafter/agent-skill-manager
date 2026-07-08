@@ -45,7 +45,7 @@ describe('D0 Infrastructure', () => {
       assert.deepEqual(err.toJSON(), {
         code: 'TEST_CODE',
         message: 'Test message',
-        details
+        details,
       })
     })
   })
@@ -65,17 +65,17 @@ describe('D0 Infrastructure', () => {
         devDir: '/my/custom/dev/dir',
         targets: {
           claude: {
-            enabled: false
-          }
+            enabled: false,
+          },
         },
         projects: [
           {
             id: 'test-project',
             name: 'Test Project',
             path: '/my/project/path',
-            enabledAgents: ['claude']
-          }
-        ]
+            enabledAgents: ['claude'],
+          },
+        ],
       }
 
       await saveConfig(userConfigData as any)
@@ -107,7 +107,7 @@ describe('D0 Infrastructure', () => {
         const oldUserPath = path.join(migrationTempDir, '.skill-manager.config.json')
         const mockConfigData = {
           devDir: '/migration/test/dev/dir',
-          projects: []
+          projects: [],
         }
         await writeFile(oldUserPath, JSON.stringify(mockConfigData, null, 2))
 
@@ -146,9 +146,9 @@ describe('D0 Infrastructure', () => {
             hasAssets: false,
             lastModified: new Date().toISOString(),
             syncedTargets: [],
-            projectInstalls: []
-          }
-        }
+            projectInstalls: [],
+          },
+        },
       }
 
       await saveRegistry(mockRegistry, tempDir)
@@ -178,20 +178,20 @@ describe('D0 Infrastructure', () => {
             enabled: true,
             userSkillPath: mockUserSkillDir,
             projectSkillPath: '.claude/skills',
-            projectRuleFile: 'CLAUDE.md'
+            projectRuleFile: 'CLAUDE.md',
           },
           codex: {
             enabled: false,
             userSkillPath: '',
             projectSkillPath: '',
-            projectRuleFile: ''
+            projectRuleFile: '',
           },
           gemini: {
             enabled: false,
             userSkillPath: '',
             projectSkillPath: '',
-            projectRuleFile: ''
-          }
+            projectRuleFile: '',
+          },
         },
         projects: [
           {
@@ -200,9 +200,9 @@ describe('D0 Infrastructure', () => {
             path: mockProjectDir,
             enabledAgents: ['claude'],
             allowProjectSkill: true,
-            allowProjectRule: true
-          }
-        ]
+            allowProjectRule: true,
+          },
+        ],
       }
 
       // Valid paths
@@ -226,17 +226,17 @@ describe('D0 Infrastructure', () => {
 
       await assert.rejects(
         assertSafeWritePath(unsafeFile, config),
-        (err: any) => err instanceof AppError && err.code === 'PATH_OUT_OF_BOUNDS'
+        (err: any) => err instanceof AppError && err.code === 'PATH_OUT_OF_BOUNDS',
       )
 
       await assert.rejects(
         assertSafeWritePath(traversalFile, config),
-        (err: any) => err instanceof AppError && err.code === 'PATH_OUT_OF_BOUNDS'
+        (err: any) => err instanceof AppError && err.code === 'PATH_OUT_OF_BOUNDS',
       )
 
       await assert.rejects(
         assertSafeWritePath(unsafeLibraryFile, config),
-        (err: any) => err instanceof AppError && err.code === 'PATH_OUT_OF_BOUNDS'
+        (err: any) => err instanceof AppError && err.code === 'PATH_OUT_OF_BOUNDS',
       )
     })
   })

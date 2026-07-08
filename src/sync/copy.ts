@@ -4,6 +4,6 @@ export async function copyDirectory(source: string, target: string): Promise<voi
   await cp(source, target, {
     recursive: true,
     force: true,
-    errorOnExist: false
+    errorOnExist: false,
   })
 }

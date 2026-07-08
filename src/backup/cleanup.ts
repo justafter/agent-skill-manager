@@ -7,5 +7,5 @@ export interface BackupRetentionPolicy {
 export const defaultBackupRetentionPolicy: BackupRetentionPolicy = {
   keepLatest: 50,
   keepDays: 30,
-  maxBytes: 2 * 1024 * 1024 * 1024
+  maxBytes: 2 * 1024 * 1024 * 1024,
 }

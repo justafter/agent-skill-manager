@@ -10,7 +10,7 @@ import { pathExists } from '../utils/fs.js'
 const ruleFileByAgent: Record<AgentId, string> = {
   claude: 'CLAUDE.md',
   codex: 'AGENTS.md',
-  gemini: 'GEMINI.md'
+  gemini: 'GEMINI.md',
 }
 
 export interface RuleSyncPlan {
@@ -22,20 +22,23 @@ export interface RuleSyncPlan {
   templateContent: string
   expectedContent: string
   patch: string
+  templateName: string
 }
 
 export async function planRuleSync(
   project: Project,
   agent: AgentId,
   root = process.cwd(),
-  templateDir?: string
+  templateDir?: string,
 ): Promise<RuleSyncPlan> {
   const fileName = ruleFileByAgent[agent]
   const targetPath = path.join(project.path, fileName)
 
+  const configuredTemplateName = project.ruleTemplates?.[agent]
+
   // Load local rule template from <templateDir> or fall back to <root>/library/rules
   const dir = templateDir || path.join(root, 'library', 'rules')
-  const template = await loadRuleTemplate(dir, agent)
+  const template = await loadRuleTemplate(dir, agent, configuredTemplateName)
   const templateContent = template.content.trim()
 
   let currentContent = ''
@@ -64,12 +67,7 @@ export async function planRuleSync(
     }
   }
 
-  const patch = diffText(
-    `project/${fileName}`,
-    `expected/${fileName}`,
-    currentContent,
-    expectedContent
-  )
+  const patch = diffText(`project/${fileName}`, `expected/${fileName}`, currentContent, expectedContent)
 
   return {
     projectId: project.id,
@@ -79,6 +77,7 @@ export async function planRuleSync(
     currentContent,
     templateContent,
     expectedContent,
-    patch
+    patch,
+    templateName: template.name,
   }
 }

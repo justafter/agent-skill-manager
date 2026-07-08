@@ -32,7 +32,7 @@ describe('D7 Project Skill Injection', () => {
       targets: {
         claude: { enabled: true, userSkillPath: '', projectSkillPath: '.claude/skills', projectRuleFile: '' },
         codex: { enabled: true, userSkillPath: '', projectSkillPath: '.agents/skills', projectRuleFile: '' },
-        gemini: { enabled: false, userSkillPath: '', projectSkillPath: '', projectRuleFile: '' }
+        gemini: { enabled: false, userSkillPath: '', projectSkillPath: '', projectRuleFile: '' },
       },
       projects: [
         {
@@ -41,14 +41,11 @@ describe('D7 Project Skill Injection', () => {
           path: projDir,
           enabledAgents: ['claude'],
           allowProjectSkill: true,
-          allowProjectRule: true
-        }
-      ]
+          allowProjectRule: true,
+        },
+      ],
     }
-    await writeFile(
-      path.join(tempWorkspace, 'skill-manager.config.json'),
-      JSON.stringify(defaultConfig, null, 2)
-    )
+    await writeFile(path.join(tempWorkspace, 'skill-manager.config.json'), JSON.stringify(defaultConfig, null, 2))
 
     // Save project config to user config as well so resolveRealpath works
     await saveConfig({ projects: defaultConfig.projects })
@@ -74,9 +71,9 @@ describe('D7 Project Skill Injection', () => {
           hasAssets: false,
           lastModified: new Date().toISOString(),
           syncedTargets: [],
-          projectInstalls: []
-        }
-      }
+          projectInstalls: [],
+        },
+      },
     }
     await mkdir(path.dirname(path.join(tempWorkspace, 'library', 'registry.json')), { recursive: true })
     await saveRegistry(registry as any, tempWorkspace)
@@ -104,9 +101,14 @@ describe('D7 Project Skill Injection', () => {
     assert.ok(targetPath.endsWith(path.join('.claude', 'skills', 'test-skill')))
 
     // 2. Apply plan
-    const applyResult = await applyProjectSkillInject(planResult.plan.planId, 'proj_test', {
-      allowManagedModify: true
-    }, tempWorkspace)
+    const applyResult = await applyProjectSkillInject(
+      planResult.plan.planId,
+      'proj_test',
+      {
+        allowManagedModify: true,
+      },
+      tempWorkspace,
+    )
 
     assert.equal(applyResult.applied.length, 1)
 
@@ -131,11 +133,11 @@ describe('D7 Project Skill Injection', () => {
 
   it('asserts path safety and rejects out-of-bounds writes', async () => {
     const config = await loadConfig(tempWorkspace)
-    
+
     // 1. Non-existent project path
     const nonExistentProject = {
       ...config.projects[0],
-      path: '/non/existent/path/for/project'
+      path: '/non/existent/path/for/project',
     }
     const registry = await loadRegistry(tempWorkspace)
     const skill = registry.skills['test-skill']
@@ -151,16 +153,18 @@ describe('D7 Project Skill Injection', () => {
       ruleTemplateDir: './library/rules',
       server: { host: '127.0.0.1', port: 47821 },
       targets: {
-        claude: { enabled: true, userSkillPath: '', projectSkillPath: '../../outside-project-skills', projectRuleFile: '' },
+        claude: {
+          enabled: true,
+          userSkillPath: '',
+          projectSkillPath: '../../outside-project-skills',
+          projectRuleFile: '',
+        },
         codex: { enabled: true, userSkillPath: '', projectSkillPath: '.agents/skills', projectRuleFile: '' },
-        gemini: { enabled: false, userSkillPath: '', projectSkillPath: '', projectRuleFile: '' }
+        gemini: { enabled: false, userSkillPath: '', projectSkillPath: '', projectRuleFile: '' },
       },
-      projects: config.projects
+      projects: config.projects,
     }
-    await writeFile(
-      path.join(tempWorkspace, 'skill-manager.config.json'),
-      JSON.stringify(evilConfig, null, 2)
-    )
+    await writeFile(path.join(tempWorkspace, 'skill-manager.config.json'), JSON.stringify(evilConfig, null, 2))
 
     await assert.rejects(async () => {
       await planProjectSkillInject(config.projects[0], skill, 'claude', tempWorkspace)

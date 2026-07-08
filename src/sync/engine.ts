@@ -17,10 +17,7 @@ import { pathExists, ensureDir } from '../utils/fs.js'
 import { AppError } from '../utils/errors.js'
 
 async function replaceDirectoryFromSource(sourceDir: string, targetDir: string): Promise<void> {
-  const tempDir = path.join(
-    path.dirname(targetDir),
-    `.${path.basename(targetDir)}.sync-${process.pid}-${Date.now()}`
-  )
+  const tempDir = path.join(path.dirname(targetDir), `.${path.basename(targetDir)}.sync-${process.pid}-${Date.now()}`)
   await rm(tempDir, { recursive: true, force: true })
   try {
     await ensureDir(path.dirname(targetDir))
@@ -41,7 +38,7 @@ async function syncPulledSkillToDevelopmentPath(
   sourceDir: string,
   developmentDir: string,
   localLibraryDir: string,
-  planId: PlanId
+  planId: PlanId,
 ): Promise<void> {
   if (path.resolve(developmentDir) === path.resolve(localLibraryDir)) {
     return
@@ -51,7 +48,7 @@ async function syncPulledSkillToDevelopmentPath(
     throw new AppError(
       'INVALID_DEVELOPMENT_PATH',
       `Development path basename must match skill name: ${developmentDir}`,
-      { skillName, developmentDir }
+      { skillName, developmentDir },
     )
   }
 
@@ -60,7 +57,7 @@ async function syncPulledSkillToDevelopmentPath(
     backupDir,
     skillName,
     developmentDir,
-    `Development path backup before pull apply ${planId}`
+    `Development path backup before pull apply ${planId}`,
   )
 
   await replaceDirectoryFromSource(sourceDir, developmentDir)
@@ -73,11 +70,11 @@ export async function planSync(
   skillName: string,
   targets?: TargetKey[],
   options: { allowManagedModify?: boolean; allowConflictOverwrite?: boolean; from?: TargetKey } = {},
-  root = process.cwd()
+  root = process.cwd(),
 ): Promise<PlanResult> {
   const registry = await loadRegistry(root)
   const skill = registry.skills[skillName]
-  
+
   if (!options.from && !skill) {
     throw new AppError('SKILL_NOT_FOUND', `Skill "${skillName}" is not registered.`)
   }
@@ -139,10 +136,10 @@ export async function planSync(
     if (!(await pathExists(sourceDir))) {
       throw new AppError(
         'SKILL_SOURCE_MISSING',
-        `Canonical source files for skill "${skillName}" are missing at ${sourceDir}.`
+        `Canonical source files for skill "${skillName}" are missing at ${sourceDir}.`,
       )
     }
-    sourceChecksum = skill.checksum
+    sourceChecksum = await checksumDirectory(sourceDir)
     sourceBytes = await getDirectorySize(sourceDir)
   }
 
@@ -200,17 +197,17 @@ export async function planSync(
           target: localSkillDir,
           bytes: sourceBytes,
           targetKey: 'local' as any,
-          targetDir: localSkillDir
+          targetDir: localSkillDir,
         })
       } else {
-        const localChecksum = skill?.checksum || await checksumDirectory(localSkillDir)
+        const localChecksum = skill?.checksum || (await checksumDirectory(localSkillDir))
         if (localChecksum === sourceChecksum) {
           items.push({
             kind: 'skip',
             target: localSkillDir,
             reason: 'identical',
             targetKey: 'local' as any,
-            targetDir: localSkillDir
+            targetDir: localSkillDir,
           })
         } else {
           items.push({
@@ -219,7 +216,7 @@ export async function planSync(
             checksumBefore: localChecksum,
             checksumAfter: sourceChecksum,
             targetKey: 'local' as any,
-            targetDir: localSkillDir
+            targetDir: localSkillDir,
           })
         }
       }
@@ -237,7 +234,12 @@ export async function planSync(
     const targetSkills = await adapter.scanUserSkills()
     const targetInfo = targetSkills[skillName]
 
-    const status = identifySkillState(skill, targetInfo)
+    const sourceState = {
+      ...(skill || {}),
+      name: skillName,
+      checksum: sourceChecksum,
+    } as any
+    const status = identifySkillState(sourceState, targetInfo)
 
     if (status === 'identical') {
       items.push({
@@ -245,7 +247,7 @@ export async function planSync(
         target: targetSkillDir,
         reason: 'identical',
         targetKey,
-        targetDir: targetSkillDir
+        targetDir: targetSkillDir,
       })
     } else if (status === 'missing') {
       items.push({
@@ -253,7 +255,7 @@ export async function planSync(
         target: targetSkillDir,
         bytes: sourceBytes,
         targetKey,
-        targetDir: targetSkillDir
+        targetDir: targetSkillDir,
       })
     } else if (status === 'changed') {
       if (options.allowManagedModify || options.allowConflictOverwrite) {
@@ -263,7 +265,7 @@ export async function planSync(
           checksumBefore: targetInfo.checksum,
           checksumAfter: sourceChecksum,
           targetKey,
-          targetDir: targetSkillDir
+          targetDir: targetSkillDir,
         })
       } else {
         items.push({
@@ -273,7 +275,7 @@ export async function planSync(
           checksumAfter: sourceChecksum,
           managedBy: 'AgentSkillManager',
           targetKey,
-          targetDir: targetSkillDir
+          targetDir: targetSkillDir,
         })
       }
     } else {
@@ -284,7 +286,7 @@ export async function planSync(
           checksumBefore: targetInfo.checksum,
           checksumAfter: sourceChecksum,
           targetKey,
-          targetDir: targetSkillDir
+          targetDir: targetSkillDir,
         })
       } else {
         items.push({
@@ -293,7 +295,7 @@ export async function planSync(
           checksumBefore: targetInfo?.checksum || 'unknown',
           checksumAfter: sourceChecksum,
           targetKey,
-          targetDir: targetSkillDir
+          targetDir: targetSkillDir,
         })
       }
     }
@@ -301,14 +303,14 @@ export async function planSync(
 
   return createPlan({
     source: sourceDir,
-    items
+    items,
   })
 }
 
 export async function applySyncPlan(
   planId: PlanId,
   options: { allowManagedModify?: boolean; allowConflictOverwrite?: boolean } = {},
-  root = process.cwd()
+  root = process.cwd(),
 ): Promise<ApplyResult> {
   const plan = getPlan(planId)
   if (!plan) {
@@ -342,7 +344,7 @@ export async function applySyncPlan(
       ) {
         throw new AppError(
           'INCONSISTENT_OPTIONS',
-          `Cannot apply modify item without overwrite permission enabled: ${item.target}`
+          `Cannot apply modify item without overwrite permission enabled: ${item.target}`,
         )
       }
 
@@ -373,7 +375,7 @@ export async function applySyncPlan(
           ...newMeta,
           localPath: existingSkill?.localPath || targetDir,
           syncedTargets: existingSkill ? existingSkill.syncedTargets : [],
-          projectInstalls: existingSkill ? existingSkill.projectInstalls : []
+          projectInstalls: existingSkill ? existingSkill.projectInstalls : [],
         }
 
         if (developmentPath) {
@@ -383,7 +385,7 @@ export async function applySyncPlan(
             plan.source,
             developmentPath,
             targetDir,
-            planId
+            planId,
           )
         }
 
@@ -415,14 +417,14 @@ export async function applySyncPlan(
         await ensureDir(path.dirname(targetDir))
         await copyDirectory(plan.source, targetDir)
 
-        const sourceHash = registry.skills[skillName]?.checksum || await checksumDirectory(plan.source)
+        const sourceHash = registry.skills[skillName]?.checksum || (await checksumDirectory(plan.source))
         await writeDeployTag(targetDir, {
           managedBy: 'AgentSkillManager',
           skillName,
           sourcePath: plan.source,
           sourceHash,
           target: targetKey,
-          deployedAt: new Date().toISOString()
+          deployedAt: new Date().toISOString(),
         })
 
         if (registry.skills[skillName]) {
@@ -442,7 +444,7 @@ export async function applySyncPlan(
     return {
       planId,
       applied,
-      skipped
+      skipped,
     }
   } catch (error) {
     try {

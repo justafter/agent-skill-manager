@@ -13,10 +13,7 @@ export interface DiffFileEntry {
   patch?: string
 }
 
-export async function diffDirectories(
-  sourceDir: string,
-  targetDir: string
-): Promise<{ files: DiffFileEntry[] }> {
+export async function diffDirectories(sourceDir: string, targetDir: string): Promise<{ files: DiffFileEntry[] }> {
   const collectRelativeFiles = async (dir: string, base = ''): Promise<string[]> => {
     const fullDir = path.join(dir, base)
     if (!(await pathExists(fullDir))) return []
@@ -51,28 +48,23 @@ export async function diffDirectories(
     if (sourceExists && !targetExists) {
       result.push({
         path: file,
-        status: 'added'
+        status: 'added',
       })
     } else if (!sourceExists && targetExists) {
       result.push({
         path: file,
-        status: 'removed'
+        status: 'removed',
       })
     } else {
       const sourceContent = await readFile(sourceFilePath, 'utf8')
       const targetContent = await readFile(targetFilePath, 'utf8')
 
       if (sourceContent !== targetContent) {
-        const patch = createTwoFilesPatch(
-          `target/${file}`,
-          `source/${file}`,
-          targetContent,
-          sourceContent
-        )
+        const patch = createTwoFilesPatch(`target/${file}`, `source/${file}`, targetContent, sourceContent)
         result.push({
           path: file,
           status: 'changed',
-          patch
+          patch,
         })
       }
     }

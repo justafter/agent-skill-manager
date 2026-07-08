@@ -39,27 +39,24 @@ describe('D3b Bidirectional & Cross-Agent Sync', () => {
           enabled: true,
           userSkillPath: claudeSkillsDir,
           projectSkillPath: '',
-          projectRuleFile: ''
+          projectRuleFile: '',
         },
         codex: {
           enabled: true,
           userSkillPath: codexSkillsDir,
           projectSkillPath: '',
-          projectRuleFile: ''
+          projectRuleFile: '',
         },
         gemini: {
           enabled: false,
           userSkillPath: '',
           projectSkillPath: '',
-          projectRuleFile: ''
-        }
+          projectRuleFile: '',
+        },
       },
-      projects: []
+      projects: [],
     }
-    await writeFile(
-      path.join(tempWorkspace, 'skill-manager.config.json'),
-      JSON.stringify(defaultConfig, null, 2)
-    )
+    await writeFile(path.join(tempWorkspace, 'skill-manager.config.json'), JSON.stringify(defaultConfig, null, 2))
 
     await mkdir(path.join(tempWorkspace, 'library', 'skills'), { recursive: true })
   })
@@ -81,11 +78,20 @@ describe('D3b Bidirectional & Cross-Agent Sync', () => {
     await mkdir(claudeSkillDir, { recursive: true })
 
     // Local code
-    await writeFile(path.join(localDir, 'SKILL.md'), '---\nname: bidir-skill\nversion: 1.0.0\ndescription: local description\n---\nLocal Code')
+    await writeFile(
+      path.join(localDir, 'SKILL.md'),
+      '---\nname: bidir-skill\nversion: 1.0.0\ndescription: local description\n---\nLocal Code',
+    )
     // Development/import directory starts with the same old version and should be updated by pull.
-    await writeFile(path.join(developmentDir, 'SKILL.md'), '---\nname: bidir-skill\nversion: 1.0.0\ndescription: local description\n---\nDevelopment Code')
+    await writeFile(
+      path.join(developmentDir, 'SKILL.md'),
+      '---\nname: bidir-skill\nversion: 1.0.0\ndescription: local description\n---\nDevelopment Code',
+    )
     // Claude code has changes and updated version
-    await writeFile(path.join(claudeSkillDir, 'SKILL.md'), '---\nname: bidir-skill\nversion: 1.5.0\ndescription: updated description\n---\nClaude Code')
+    await writeFile(
+      path.join(claudeSkillDir, 'SKILL.md'),
+      '---\nname: bidir-skill\nversion: 1.5.0\ndescription: updated description\n---\nClaude Code',
+    )
 
     // Initial registry save
     const registry = await loadRegistry(tempWorkspace)
@@ -96,7 +102,7 @@ describe('D3b Bidirectional & Cross-Agent Sync', () => {
       checksum: 'sha256:local-init-checksum' as any,
       localPath: developmentDir,
       syncedTargets: [],
-      projectInstalls: []
+      projectInstalls: [],
     }
     await saveRegistry(registry, tempWorkspace)
 
@@ -107,7 +113,7 @@ describe('D3b Bidirectional & Cross-Agent Sync', () => {
       sourcePath: localDir,
       sourceHash: 'sha256:some-older-hash',
       target: 'claude:user',
-      deployedAt: '2026-07-06'
+      deployedAt: '2026-07-06',
     })
 
     // Plan pull (from Claude:user to local)
@@ -141,7 +147,7 @@ describe('D3b Bidirectional & Cross-Agent Sync', () => {
     // Verify backup created under backups/bk_*
     const backupsDir = path.join(tempWorkspace, 'backups')
     const backupEntries = await readdir(backupsDir)
-    const bkFolder = backupEntries.find(e => e.startsWith('bk_'))
+    const bkFolder = backupEntries.find((e) => e.startsWith('bk_'))
     assert.ok(bkFolder)
     const backupRegistrySnapshot = path.join(backupsDir, bkFolder, 'registry-snapshot.json')
     assert.ok(await pathExists(backupRegistrySnapshot))
@@ -150,13 +156,13 @@ describe('D3b Bidirectional & Cross-Agent Sync', () => {
 
     const backupIndexes = await Promise.all(
       backupEntries
-        .filter(e => e.startsWith('bk_'))
-        .map(async e => JSON.parse(await readFile(path.join(backupsDir, e, 'index.json'), 'utf8')))
+        .filter((e) => e.startsWith('bk_'))
+        .map(async (e) => JSON.parse(await readFile(path.join(backupsDir, e, 'index.json'), 'utf8'))),
     )
     assert.ok(
-      backupIndexes.some(index =>
-        index.items.some((item: any) => item.targetType === 'development' && item.originalPath === developmentDir)
-      )
+      backupIndexes.some((index) =>
+        index.items.some((item: any) => item.targetType === 'development' && item.originalPath === developmentDir),
+      ),
     )
   })
 
@@ -166,12 +172,15 @@ describe('D3b Bidirectional & Cross-Agent Sync', () => {
     const codexSkillDir = path.join(codexSkillsDir, skillName)
 
     // Modify Claude code again
-    await writeFile(path.join(claudeSkillDir, 'SKILL.md'), '---\nname: bidir-skill\nversion: 2.0.0\ndescription: cross-agent description\n---\nClaude Version 2')
+    await writeFile(
+      path.join(claudeSkillDir, 'SKILL.md'),
+      '---\nname: bidir-skill\nversion: 2.0.0\ndescription: cross-agent description\n---\nClaude Version 2',
+    )
 
     // Plan cross-agent sync (from Claude:user to Codex:user)
     // Codex:user is specified, but since from is claude:user, it implicitly inserts local target first
     const planResult = await planSync(skillName, ['codex:user'], { from: 'claude:user' }, tempWorkspace)
-    
+
     // Items should be: local (modify) and codex:user (create)
     assert.equal(planResult.plan.items.length, 2)
     assert.equal(planResult.plan.items[0].targetKey, 'local')

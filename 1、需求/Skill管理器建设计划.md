@@ -28,24 +28,24 @@
 
 本节集中记录本工具需要覆盖的完整需求，避免需求分散在后文各模块中不易追踪。
 
-| 用户需求 | 计划中的落点 | 首版处理方式 |
-| --- | --- | --- |
-| 做一个工具、skill 或其他形式，用来把技能同步给所有 agent | 本方案定位为“本地 Skill 管理器”，不是单个 Skill | 以独立本地工具实现，保留 CLI 与 Web UI |
-| 同步给 Claude Code | Claude 适配器、用户级路径、项目级路径 | 支持用户级 `.claude\\skills` 和项目级 `.claude\\skills` |
-| 同步给 Codex | Codex 适配器、用户级路径、项目级路径 | 支持用户级 `.agents\\skills` 和项目级 `.agents\\skills` |
-| 同步给 Antigravity / Gemini | Gemini / Antigravity 适配器 | 支持 Antigravity 本机插件 skills 目录，加载效果需实机验证 |
-| 参考截图中的 Skills 管理页面 | Web UI 页面规划 | 实现列表、计数、导入、备份恢复、检查更新、项目空间 |
-| 可以从已有目录导入 Skill | 导入已有、Skill 解析与校验模块 | 支持选择本地目录导入 |
-| 可以从 ZIP 安装 Skill | 后续扩展入口 | 本次版本不做，后续再考虑 |
-| 可以备份和恢复 | 备份恢复模块 | 写入前自动备份，支持按备份恢复 |
-| 可以检查更新 | 多端扫描比对、本地更新检查 | 首版只做本地 hash / mtime 比对，不联网；由用户点击“检查更新”时触发，不在页面加载时实时扫描 |
-| 可以 dry-run 预览 | 同步引擎、Diff 与确认窗口 | 所有写入先生成 plan，再确认执行 |
-| 可以选择项目注入 Skill | 项目工作区模块、项目级 Skill 注入 | 支持选项目、选 Skill、选 Agent 后注入项目级目录 |
-| 可以选择项目更新 `CLAUDE.md` | 规则模板同步模块 | 支持 Claude 项目规则模板写入、diff、托管块更新、拉取 |
-| 可以选择项目更新 `AGENTS.md` | 规则模板同步模块 | 支持 Codex / 通用 Agent 项目规则模板写入、diff、托管块更新、拉取 |
-| 可以选择项目更新其他 Agent 相关规则 | Agent 规则配置同步、适配器扩展 | 首版支持 `GEMINI.md`；其他如 `.cursor/rules`、`.windsurfrules` 先扫描展示，后续扩展写入 |
-| Agent 自己修改 Skill 或规则后能回收 | 多 Agent 自我进化与多向同步 | 支持扫描差异、拉取回本地、项目规则拉取为模板 |
-| 不要直接开发，只写计划到笔记 | 后续实施边界 | 当前只维护此 Obsidian 笔记，不创建 `D:\\AgentSkillManager` |
+| 用户需求                                                 | 计划中的落点                                    | 首版处理方式                                                                               |
+| -------------------------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| 做一个工具、skill 或其他形式，用来把技能同步给所有 agent | 本方案定位为“本地 Skill 管理器”，不是单个 Skill | 以独立本地工具实现，保留 CLI 与 Web UI                                                     |
+| 同步给 Claude Code                                       | Claude 适配器、用户级路径、项目级路径           | 支持用户级 `.claude\\skills` 和项目级 `.claude\\skills`                                    |
+| 同步给 Codex                                             | Codex 适配器、用户级路径、项目级路径            | 支持用户级 `.agents\\skills` 和项目级 `.agents\\skills`                                    |
+| 同步给 Antigravity / Gemini                              | Gemini / Antigravity 适配器                     | 支持 Antigravity 本机插件 skills 目录，加载效果需实机验证                                  |
+| 参考截图中的 Skills 管理页面                             | Web UI 页面规划                                 | 实现列表、计数、导入、备份恢复、检查更新、项目空间                                         |
+| 可以从已有目录导入 Skill                                 | 导入已有、Skill 解析与校验模块                  | 支持选择本地目录导入                                                                       |
+| 可以从 ZIP 安装 Skill                                    | 后续扩展入口                                    | 本次版本不做，后续再考虑                                                                   |
+| 可以备份和恢复                                           | 备份恢复模块                                    | 写入前自动备份，支持按备份恢复                                                             |
+| 可以检查更新                                             | 多端扫描比对、本地更新检查                      | 首版只做本地 hash / mtime 比对，不联网；由用户点击“检查更新”时触发，不在页面加载时实时扫描 |
+| 可以 dry-run 预览                                        | 同步引擎、Diff 与确认窗口                       | 所有写入先生成 plan，再确认执行                                                            |
+| 可以选择项目注入 Skill                                   | 项目工作区模块、项目级 Skill 注入               | 支持选项目、选 Skill、选 Agent 后注入项目级目录                                            |
+| 可以选择项目更新 `CLAUDE.md`                             | 规则模板同步模块                                | 支持 Claude 项目规则模板写入、diff、托管块更新、拉取                                       |
+| 可以选择项目更新 `AGENTS.md`                             | 规则模板同步模块                                | 支持 Codex / 通用 Agent 项目规则模板写入、diff、托管块更新、拉取                           |
+| 可以选择项目更新其他 Agent 相关规则                      | Agent 规则配置同步、适配器扩展                  | 首版支持 `GEMINI.md`；其他如 `.cursor/rules`、`.windsurfrules` 先扫描展示，后续扩展写入    |
+| Agent 自己修改 Skill 或规则后能回收                      | 多 Agent 自我进化与多向同步                     | 支持扫描差异、拉取回本地、项目规则拉取为模板                                               |
+| 不要直接开发，只写计划到笔记                             | 后续实施边界                                    | 当前只维护此 Obsidian 笔记，不创建 `D:\\AgentSkillManager`                                 |
 
 ### 首版明确包含
 
@@ -404,6 +404,7 @@ applyRuleUpdate(project, template)
 
 ```md
 <!-- BEGIN AgentSkillManager:codex -->
+
 这里是由 Skill 管理器维护的 Codex 项目规则片段。
 <!-- END AgentSkillManager:codex -->
 ```
@@ -571,21 +572,31 @@ D:\Obsidian笔记\.agents\skills\<skill-name>
 - 如果项目中存在目标规则文件且包含托管块：只更新托管块。
 - 如果项目中存在目标规则文件但没有托管块：展示 diff，不自动覆盖。
 
-### 4. 项目规则模板
+### 4. 项目规则模板与相互更新迭代
 
-模板可分为三类：
+本系统采用**以模板为中心 (Template-Centric)** 的设计，允许用户针对同一个 Agent（如 Claude）维护多个不同项目类型的自定义规则模板（如 `react-frontend.md`、`python-backend.md`），并支持在模板与多个项目之间进行相互更新和迭代：
 
-- **通用模板**：所有项目通用的 Agent 工作规则。
-- **Agent 专用模板**：如 Claude、Codex、Gemini 各自的项目入口文件。
-- **项目类型模板**：如 Android、Harmony、Obsidian、前端、后端、脚本工具。
+#### 4.1 模板存储与项目选择
 
-后续可支持选择模板组合：
+- **模板文件存储**：自定义规则文件以 `.md` 结尾，存放在本地模板库对应的 Agent 目录下（例如 `library/rules/claude/react-frontend.md`）。
+- **项目绑定**：允许在项目配置中为每个启用的一级 Agent 规则文件绑定一个指定的模板文件。如果未显式绑定，默认会回退使用该 Agent 的标准文件名作为模板名（如 `CLAUDE.md` / `AGENTS.md` / `GEMINI.md`）。
 
-```text
-通用规则 + Codex 模板 + Android 项目模板
-```
+#### 4.2 命名转换机制（Sync Translation）
 
-首版可先只支持单模板写入，避免合并规则过早复杂化。
+为了保证终端工具能够识别并加载规则，规则文件在同步到项目时会自动转换为 Agent 规定的标准文件名，在拉取回模板库时也会还原到对应的模板文件名：
+
+- **Claude**：本地模板 `<any_name>.md` $\leftrightarrow$ 项目中生成的实际文件 `<project>/CLAUDE.md`
+- **Codex**：本地模板 `<any_name>.md` $\leftrightarrow$ 项目中生成的实际文件 `<project>/AGENTS.md`
+- **Gemini**：本地模板 `<any_name>.md` $\leftrightarrow$ 项目中生成的实际文件 `<project>/GEMINI.md`
+
+#### 4.3 相互更新与迭代流程（Mutual Iteration Loop）
+
+规则模板不仅是由上往下分发的，也会随着项目开发而不断演进。系统支持如下闭环流程：
+
+1. **项目规则演进**：在某项目（如项目 A）的开发过程中，AI Agent 在实际使用中改进并优化了项目级规则文件（如项目中的 `CLAUDE.md`）。
+2. **反向拉取（进化模板）**：用户在模板库的 Web UI 中对该项目点击“拉取 (Pull)”，把优化后的规则内容拉回并更新到对应的本地模板文件（如 `react-frontend.md`）。
+3. **差异广播（更新同步）**：一旦本地模板 `react-frontend.md` 更新后，所有同样关联该模板的其他项目（如项目 B、项目 C）将自动在 UI 上高亮显示差异为“待更新”状态。
+4. **正向推送（广播规范）**：用户可点击批量推送，将最新的规范一次性更新到所有关联的项目中，实现所有项目规则的相互同步与迭代。
 
 ## 开发者创作与热更新 (Watch Mode)
 
@@ -626,6 +637,7 @@ D:\Obsidian笔记\.agents\skills\<skill-name>
 - `asm project plan-rules <project-id> --agent <agent>` - 生成项目规则文件更新计划。
 - `asm project push-rules <project-id> --agent <agent> [--mode block|overwrite]` - 将规则模板写入项目。
 - `asm project pull-rules <project-id> --agent <agent> --as <template-name>` - 将项目规则文件拉取为模板。
+- `asm project remove <project-id> [--yes]` - 从注册表移除项目（仅解除注册，不删除文件；带影响预览，需显式确认；`--yes` 跳过交互式确认，**不跳过预览打印**）。
 - `asm doctor` - 检查 Node 版本、配置文件、目标目录权限和 Agent 路径是否存在。
 
 ## 本地 API 设计
@@ -650,6 +662,8 @@ D:\Obsidian笔记\.agents\skills\<skill-name>
 - `POST /api/watch/stop`：关闭监听。
 - `GET /api/projects`：列出注册项目。
 - `POST /api/projects`：注册项目。
+- `DELETE /api/projects/:id`：解除项目注册（仅修改配置，不删除文件）；请求体可携带 `confirmed: true` 表示已确认影响预览；返回 200 携带新的项目列表与本次移除的备份快照路径。
+- `GET /api/projects/:id/remove-preview`：获取解除注册的影响预览（待移除注册记录、当前项目级 Skill 安装列表、当前已同步规则文件列表），供前端弹窗渲染。
 - `POST /api/projects/:id/scan`：扫描项目级 Agent 文件。
 - `POST /api/projects/:id/inject/plan`：生成项目级 Skill 注入计划。
 - `POST /api/projects/:id/inject/apply`：执行项目级 Skill 注入。
@@ -780,20 +794,20 @@ Rule 与 Skill 的展示能力对齐，但 **仅做项目级**（无全局 Rule 
 
 三个按钮都围绕**本地权威模板**与**项目级规则文件**之间双向流动。下表中"模板"= `library/rules/<agent>/<file>`，"项目文件" = `<project.path>/<fileName>`（例如 `<project>/CLAUDE.md`）。
 
-| 按钮 | 后端调用 | 模式 (`mode`) | 行为 | 数据流向 | 触发条件 / 限制 |
-| --- | --- | --- | --- | --- | --- |
-| **查看 Diff** | `GET /api/rules/diff?projectId=<id>&agent=<agent>` | — | 读取模板与项目文件，按 `planRuleSync` 生成 Unified Diff；返回 `{ status, currentContent, templateContent, expectedContent, patch }`。**不写任何文件**，纯展示。 | — | 无副作用，可随时调用 |
-| **推送 ↑** | `POST /api/projects/<id>/rules/sync { agent, mode }` | 自适应 | 用模板**写入**项目文件。`mode` 根据 Diff 状态自动选择：`status === 'conflict' → overwrite`，否则 `block`。 | 模板 → 项目文件 | 同步前自动备份；`overwrite` 会覆盖已有内容；`block` 优先更新托管块，缺失则追加 |
-| **拉取 ↓** | `POST /api/projects/<id>/rules/sync { agent, mode: 'pull' }` | `pull` | 把项目文件中的**托管块内容**反向写回模板。 | 项目文件 → 模板 | **项目文件必须包含托管块**；否则后端抛错 `Project rules file does not contain a managed block to pull`；执行前会先备份本地模板；前端用 `window.confirm` 做二次确认 |
+| 按钮          | 后端调用                                                     | 模式 (`mode`) | 行为                                                                                                                                                            | 数据流向        | 触发条件 / 限制                                                                                                                                                    |
+| ------------- | ------------------------------------------------------------ | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **查看 Diff** | `GET /api/rules/diff?projectId=<id>&agent=<agent>`           | —             | 读取模板与项目文件，按 `planRuleSync` 生成 Unified Diff；返回 `{ status, currentContent, templateContent, expectedContent, patch }`。**不写任何文件**，纯展示。 | —               | 无副作用，可随时调用                                                                                                                                               |
+| **推送 ↑**    | `POST /api/projects/<id>/rules/sync { agent, mode }`         | 自适应        | 用模板**写入**项目文件。`mode` 根据 Diff 状态自动选择：`status === 'conflict' → overwrite`，否则 `block`。                                                      | 模板 → 项目文件 | 同步前自动备份；`overwrite` 会覆盖已有内容；`block` 优先更新托管块，缺失则追加                                                                                     |
+| **拉取 ↓**    | `POST /api/projects/<id>/rules/sync { agent, mode: 'pull' }` | `pull`        | 把项目文件中的**托管块内容**反向写回模板。                                                                                                                      | 项目文件 → 模板 | **项目文件必须包含托管块**；否则后端抛错 `Project rules file does not contain a managed block to pull`；执行前会先备份本地模板；前端用 `window.confirm` 做二次确认 |
 
 **`planRuleSync` 返回的 4 种 status 与对应操作**：
 
-| `status` | 触发条件 | 推送按钮行为 | 拉取按钮行为 |
-| --- | --- | --- | --- |
-| `create` | 项目文件不存在 | `block` → 写入全新文件（模板内容 + 末尾换行） | 若项目文件不存在直接报错 |
-| `identical` | 项目文件存在，托管块内容与模板**完全一致** | **推送按钮置灰**（无变更） | 拉取：项目有托管块，可拉回（实际就是同内容覆盖模板） |
-| `block` | 项目文件存在，**含托管块**，但块内文本与模板不一致 | `block` → 只替换块内文本，保留用户块外内容 | 可拉取（拉取的是块内最新文本） |
-| `conflict` | 项目文件存在，**无托管块** | `overwrite` → 完全覆盖项目文件（用户块外内容会丢） | 报错（无法定位哪些是"权威"内容） |
+| `status`    | 触发条件                                           | 推送按钮行为                                       | 拉取按钮行为                                         |
+| ----------- | -------------------------------------------------- | -------------------------------------------------- | ---------------------------------------------------- |
+| `create`    | 项目文件不存在                                     | `block` → 写入全新文件（模板内容 + 末尾换行）      | 若项目文件不存在直接报错                             |
+| `identical` | 项目文件存在，托管块内容与模板**完全一致**         | **推送按钮置灰**（无变更）                         | 拉取：项目有托管块，可拉回（实际就是同内容覆盖模板） |
+| `block`     | 项目文件存在，**含托管块**，但块内文本与模板不一致 | `block` → 只替换块内文本，保留用户块外内容         | 可拉取（拉取的是块内最新文本）                       |
+| `conflict`  | 项目文件存在，**无托管块**                         | `overwrite` → 完全覆盖项目文件（用户块外内容会丢） | 报错（无法定位哪些是"权威"内容）                     |
 
 **安全约束**：
 
@@ -852,6 +866,44 @@ Rule 与 Skill 的展示能力对齐，但 **仅做项目级**（无全局 Rule 
 - **Agent 规则模板同步器**：展示项目中的 `CLAUDE.md` / `AGENTS.md` / `GEMINI.md` 与模板差异。
 - **项目规则拉取**：把项目中的成熟规则拉回模板库。
 - **项目状态扫描**：重新扫描项目目录。
+
+#### 4.1 项目移除（解除注册）
+
+支持将已注册项目从 `skill-manager.config.json` 的 `projects[]` 列表中移除。**首版仅做解除注册，不级联清理任何文件**；该项目路径下已注入的项目级 Skill 与规则文件**保留原状**。
+
+工作流：
+
+1. 用户在 `项目空间` 列表/详情页点击 `移除项目` 按钮，或执行 `asm project remove <project-id>`。
+2. 前端弹窗（CLI 用 `--yes` 跳过交互）展示影响预览：
+   - 待移除的注册记录：`{id, name, path}`。
+   - 该项目当前所有项目级 Skill 安装列表（来自 `library/skills/<skill>/projectInstalls`，过滤 `target === project.id`）：`{skill, agent, projectSkillPath}` 及其展开后的绝对路径。
+   - 该项目当前所有已同步规则文件列表（来自 `library/rules/<agent>/<file>` 的 `installedPaths`，过滤到该项目）。
+   - 明确标注「以上 Skill 与规则文件不会被删除，移除后仅不再受本工具管理」。
+3. 用户勾选 `我已了解上述文件不会被删除` 后才能点击 `确认移除`。
+4. 移除前自动创建一份配置快照备份到 `backups/config-snapshots/remove-project-<id>-<timestamp>.json`，便于回滚。
+5. 写入新配置（移除目标项目），刷新内存与磁盘。
+6. 移除成功后给出提示：项目路径仍可访问，原 Skill 与规则文件保持原状；如需彻底清理，请手动删除或后续在项目详情页触发新的清理流程。
+
+约束：
+
+- 路径校验：仍按 §实现约束校验真实路径必须落在注册项目内部（即只能移除当前已注册的项目，不能传未注册路径）。
+- 不删除任何文件：包括项目目录下的 `.claude/skills/<skill>`、`.agents/skills/<skill>`、`CLAUDE.md`、`AGENTS.md`、`GEMINI.md` 等。
+- 不清理本地库元数据：`library/skills/<skill>/projectInstalls` 中指向被移除项目的条目**保留**（含其绝对路径记录），仅在该项目被重新注册后才会再次在 UI 出现，便于历史回溯。后续若需要『清理失效项目引用』，通过独立的 scan/reconcile 任务处理。
+- 并发与回滚：移除操作是配置层面的事务；如写入失败则回滚到原配置并报错，不留半状态。
+- 影响范围控制：移除项目不会级联触发该项目内 Skill 的 uninstall、不会触发规则模板的回写、不会影响其它已注册项目。
+
+错误场景：
+
+- 项目 id 不存在 → 提示 `项目不存在`，不修改配置。
+- 路径校验失败 → 拒绝执行并提示。
+- 备份或配置写入失败 → 保留原配置并报告错误。
+
+#### 4.2 与其它模块的关系
+
+- 与 §2 Skill 注入：`remove` 只解除注册，不影响已注入的文件；如需重新注入，重新 `add` 同路径即可。
+- 与 §3 规则模板同步：`remove` 不修改模板库；项目级规则文件维持当前内容。
+- 与 §D4 备份恢复：`remove` 自动产生一份配置快照备份，可通过恢复流程回滚该次移除操作。
+- 与 §5 Diff 与确认窗口：`remove` 走的是配置影响预览窗口（不展示文件 diff），与写入操作的 diff 窗口解耦。
 
 ### 5. Diff 与确认窗口
 

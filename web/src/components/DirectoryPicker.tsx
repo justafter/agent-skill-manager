@@ -15,9 +15,7 @@ export interface DirectoryPickerProps {
 }
 
 type PickerStatus =
-  | { kind: 'idle' }
-  | { kind: 'picked'; via: 'native' | 'webkit'; note?: string }
-  | { kind: 'failed'; message: string }
+  { kind: 'idle' } | { kind: 'picked'; via: 'native' | 'webkit'; note?: string } | { kind: 'failed'; message: string }
 
 /**
  * A directory picker that supports three input modes:
@@ -33,19 +31,11 @@ type PickerStatus =
  * resolve an absolute path, it shows an inline notice asking the user to
  * confirm/paste the full path.
  */
-export function DirectoryPicker({
-  id,
-  value,
-  onChange,
-  placeholder,
-  disabled,
-  hint
-}: DirectoryPickerProps) {
+export function DirectoryPicker({ id, value, onChange, placeholder, disabled, hint }: DirectoryPickerProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [status, setStatus] = useState<PickerStatus>({ kind: 'idle' })
 
-  const supportsNative =
-    typeof window !== 'undefined' && typeof (window as any).showDirectoryPicker === 'function'
+  const supportsNative = typeof window !== 'undefined' && typeof (window as any).showDirectoryPicker === 'function'
 
   const pickNative = async () => {
     try {
@@ -62,7 +52,7 @@ export function DirectoryPicker({
         setStatus({
           kind: 'picked',
           via: 'native',
-          note: '浏览器仅返回目录名，请补全为绝对路径。'
+          note: '浏览器仅返回目录名，请补全为绝对路径。',
         })
       }
     } catch (err) {
@@ -84,7 +74,7 @@ export function DirectoryPicker({
     setStatus({
       kind: 'picked',
       via: 'webkit',
-      note: '浏览器仅返回目录名，请补全为绝对路径。'
+      note: '浏览器仅返回目录名，请补全为绝对路径。',
     })
   }
 
@@ -141,19 +131,14 @@ export function DirectoryPicker({
           style={{
             marginTop: '6px',
             fontSize: '12px',
-            color:
-              status.kind === 'failed'
-                ? '#cf222e'
-                : status.kind === 'picked'
-                ? '#1a7f37'
-                : '#57606a'
+            color: status.kind === 'failed' ? '#cf222e' : status.kind === 'picked' ? '#1a7f37' : '#57606a',
           }}
         >
           {status.kind === 'failed'
             ? `选择目录失败：${status.message}`
             : status.kind === 'picked' && status.note
-            ? status.note
-            : hint}
+              ? status.note
+              : hint}
         </p>
       ) : null}
     </div>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useApi } from '../hooks/useApi'
-import { apiGet, apiPost } from '../api/client'
+import { apiGet, apiPost, apiPut } from '../api/client'
 import { DiffView } from '../components/DiffView'
 import { DirectoryPicker } from '../components/DirectoryPicker'
 
@@ -50,6 +50,7 @@ export function RulesPage() {
   const [activeProject, setActiveProject] = useState<Record<string, string>>({})
   const [diffByKey, setDiffByKey] = useState<Record<string, any>>({})
   const [loadingDiff, setLoadingDiff] = useState<Record<string, boolean>>({})
+  const [showDiffByKey, setShowDiffByKey] = useState<Record<string, boolean>>({})
   const [isSyncing, setIsSyncing] = useState<Record<string, boolean>>({})
   const [syncMessage, setSyncMessage] = useState<Record<string, string | null>>({})
   const [crossExpanded, setCrossExpanded] = useState<Record<string, boolean>>({})
@@ -61,6 +62,33 @@ export function RulesPage() {
   const [tplNewPath, setTplNewPath] = useState('')
   const [tplSaving, setTplSaving] = useState(false)
   const [tplMessage, setTplMessage] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+
+  // Create template modal state
+  const [createDialogOpen, setCreateDialogOpen] = useState(false)
+  const [createAgent, setCreateAgent] = useState<'claude' | 'codex' | 'gemini'>('claude')
+  const [createName, setCreateName] = useState('')
+  const [createSaving, setCreateSaving] = useState(false)
+  const [createMessage, setCreateMessage] = useState<string | null>(null)
+
+  const handleCreateTemplate = async () => {
+    if (!createName.trim()) return
+    const name = createName.trim().endsWith('.md') ? createName.trim() : `${createName.trim()}.md`
+    try {
+      setCreateSaving(true)
+      setCreateMessage(null)
+      await apiPost('/api/rules', {
+        agent: createAgent,
+        name,
+      })
+      await refetch()
+      setCreateDialogOpen(false)
+      setCreateName('')
+    } catch (err) {
+      setCreateMessage(`创建模板失败: ${(err as Error).message}`)
+    } finally {
+      setCreateSaving(false)
+    }
+  }
 
   useEffect(() => {
     if (tplDialogOpen && tplNewPath === '' && tplDir?.absolute) {
@@ -82,7 +110,7 @@ export function RulesPage() {
       const res = await fetch('/api/config/rule-template-dir', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: tplNewPath.trim() })
+        body: JSON.stringify({ path: tplNewPath.trim() }),
       })
       if (!res.ok) {
         const errBody = await res.json().catch(() => ({}))
@@ -100,7 +128,9 @@ export function RulesPage() {
   }
 
   const [isScanningRules, setIsScanningRules] = useState(false)
-  const [ruleNotifications, setRuleNotifications] = useState<Array<{ projectId: string; agent: string; lastDetectedAt: string }>>([])
+  const [ruleNotifications, setRuleNotifications] = useState<
+    Array<{ projectId: string; agent: string; lastDetectedAt: string }>
+  >([])
   const [scanFinishedMessage, setScanFinishedMessage] = useState<string | null>(null)
 
   const handleScanRules = async () => {
@@ -124,7 +154,9 @@ export function RulesPage() {
   }
 
   const expandAndShowDiff = async (agent: string, projectId: string) => {
-    setExpandedAgents((prev) => ({ ...prev, [agent]: true }))
+    const matchedRule = rules.find((r) => r.agent === agent && r.installedPaths.some((p) => p.projectId === projectId))
+    const tKey = matchedRule ? `${agent}:${matchedRule.name}` : agent
+    setExpandedAgents((prev) => ({ ...prev, [tKey]: true }))
     await loadDiff(agent, projectId)
     const elementId = `rule-row-${agent}-${projectId}`
     setTimeout(() => {
@@ -147,7 +179,11 @@ export function RulesPage() {
   }
 
   if (isLoading || !rulesData) {
-    return <div className="page"><div className="empty-state">正在加载 Rule 模板...</div></div>
+    return (
+      <div className="page">
+        <div className="empty-state">正在加载 Rule 模板...</div>
+      </div>
+    )
   }
 
   const rules: RuleEntry[] = rulesData.rules || []
@@ -160,6 +196,7 @@ export function RulesPage() {
     try {
       const plan = await apiGet<any>(`/api/rules/diff?projectId=${projectId}&agent=${agent}`)
       setDiffByKey((s) => ({ ...s, [k]: plan }))
+      setShowDiffByKey((s) => ({ ...s, [k]: true }))
     } catch (err) {
       setSyncMessage((s) => ({ ...s, [k]: `加载 diff 失败: ${(err as Error).message}` }))
     } finally {
@@ -206,22 +243,28 @@ export function RulesPage() {
     projectId: string,
     sourceAgent: string,
     targetAgent: string,
-    mode: 'block' | 'overwrite' = 'block'
+    mode: 'block' | 'overwrite' = 'block',
   ) => {
     const k = `cross:${projectId}:${sourceAgent}->${targetAgent}`
     const verb = mode === 'overwrite' ? '完全覆写' : '替换托管块'
-    if (!window.confirm(
-      `是否确认互推同步？\n\n源: 项目内的 ${sourceAgent.toUpperCase()} 规则文件\n目标: 同项目的 ${targetAgent.toUpperCase()} 规则文件\n模式: ${verb}\n\n注：目标文件写入前会自动备份。`
-    )) return
+    if (
+      !window.confirm(
+        `是否确认互推同步？\n\n源: 项目内的 ${sourceAgent.toUpperCase()} 规则文件\n目标: 同项目的 ${targetAgent.toUpperCase()} 规则文件\n模式: ${verb}\n\n注：目标文件写入前会自动备份。`,
+      )
+    )
+      return
     try {
       setCrossInProgress((s) => ({ ...s, [k]: true }))
       setCrossMessage((s) => ({ ...s, [k]: null }))
       await apiPost(`/api/projects/${projectId}/rules/cross-sync`, {
         sourceAgent,
         targetAgent,
-        mode
+        mode,
       })
-      setCrossMessage((s) => ({ ...s, [k]: `[成功] ${sourceAgent.toUpperCase()} → ${targetAgent.toUpperCase()} (${mode})` }))
+      setCrossMessage((s) => ({
+        ...s,
+        [k]: `[成功] ${sourceAgent.toUpperCase()} → ${targetAgent.toUpperCase()} (${mode})`,
+      }))
       await refetch()
     } catch (err) {
       setCrossMessage((s) => ({ ...s, [k]: `互推失败: ${(err as Error).message}` }))
@@ -242,7 +285,7 @@ export function RulesPage() {
             marginBottom: '20px',
             display: 'flex',
             flexDirection: 'column',
-            gap: '8px'
+            gap: '8px',
           }}
         >
           <div style={{ fontWeight: 600, color: '#9a6700', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -252,7 +295,8 @@ export function RulesPage() {
             </span>
           </div>
           {ruleNotifications.map((n) => {
-            const projName = rules[0]?.installedPaths.find(p => p.projectId === n.projectId)?.projectName || n.projectId
+            const projName =
+              rules[0]?.installedPaths.find((p) => p.projectId === n.projectId)?.projectName || n.projectId
             return (
               <div
                 key={`${n.projectId}-${n.agent}`}
@@ -264,14 +308,12 @@ export function RulesPage() {
                   border: '1px solid #e1e4e8',
                   borderRadius: '4px',
                   padding: '8px 12px',
-                  fontSize: '13px'
+                  fontSize: '13px',
                 }}
               >
                 <div>
                   <strong>{projName}</strong> 中的 <strong>{n.agent.toUpperCase()}</strong> 规则文件在{' '}
-                  <span style={{ fontFamily: 'monospace' }}>
-                    {new Date(n.lastDetectedAt).toLocaleTimeString()}
-                  </span>{' '}
+                  <span style={{ fontFamily: 'monospace' }}>{new Date(n.lastDetectedAt).toLocaleTimeString()}</span>{' '}
                   发生变更
                 </div>
                 <div style={{ display: 'flex', gap: '8px' }}>
@@ -327,12 +369,20 @@ export function RulesPage() {
               {tplDir?.absolute || tplDir?.raw || '(未配置)'}
             </code>
           </span>
-          <button
-            className="button"
-            type="button"
-            onClick={handleOpenTplDialog}
-          >
+          <button className="button" type="button" onClick={handleOpenTplDialog}>
             切换模板目录…
+          </button>
+          <button
+            className="button button-primary"
+            type="button"
+            onClick={() => {
+              setCreateAgent('claude')
+              setCreateName('')
+              setCreateMessage(null)
+              setCreateDialogOpen(true)
+            }}
+          >
+            + 新建模板
           </button>
         </div>
       </div>
@@ -387,8 +437,7 @@ export function RulesPage() {
                     fontSize: '13px',
                     background: tplMessage.type === 'success' ? '#dafbe1' : '#ffebe9',
                     color: tplMessage.type === 'success' ? '#1a7f37' : '#cf222e',
-                    border:
-                      tplMessage.type === 'success' ? '1px solid #c4f2d2' : '1px solid #ffc8c4'
+                    border: tplMessage.type === 'success' ? '1px solid #c4f2d2' : '1px solid #ffc8c4',
                   }}
                 >
                   {tplMessage.message}
@@ -397,12 +446,7 @@ export function RulesPage() {
             </div>
 
             <div className="modal-footer">
-              <button
-                type="button"
-                className="button"
-                onClick={() => setTplDialogOpen(false)}
-                disabled={tplSaving}
-              >
+              <button type="button" className="button" onClick={() => setTplDialogOpen(false)} disabled={tplSaving}>
                 取消
               </button>
               <button
@@ -418,14 +462,112 @@ export function RulesPage() {
         </div>
       )}
 
+      {createDialogOpen && (
+        <div className="modal-overlay" onClick={() => !createSaving && setCreateDialogOpen(false)}>
+          <div
+            className="modal-content"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: '480px', width: '90%' }}
+          >
+            <div className="modal-header">
+              <span>新建 Rule 规则模板</span>
+              <button
+                type="button"
+                className="button"
+                style={{ padding: '4px 8px' }}
+                onClick={() => setCreateDialogOpen(false)}
+                disabled={createSaving}
+              >
+                &times;
+              </button>
+            </div>
+
+            <div className="modal-body">
+              <p style={{ color: '#57606a', fontSize: '13px', marginBottom: '16px' }}>
+                在新模板中定义的规则会存放在本地模板库目录下。绑定到项目后，会自动转换为 Agent 所需的标准文件名。
+              </p>
+
+              <div className="form-group">
+                <label>选择 Agent 类型</label>
+                <select
+                  className="form-input"
+                  value={createAgent}
+                  onChange={(e) => setCreateAgent(e.target.value as any)}
+                  disabled={createSaving}
+                >
+                  <option value="claude">Claude (CLAUDE.md)</option>
+                  <option value="codex">Codex (AGENTS.md)</option>
+                  <option value="gemini">Gemini (GEMINI.md)</option>
+                </select>
+              </div>
+
+              <div className="form-group" style={{ marginTop: '12px' }}>
+                <label htmlFor="create-rule-name">模板文件名</label>
+                <input
+                  id="create-rule-name"
+                  type="text"
+                  className="form-input"
+                  placeholder="例如: react-frontend.md"
+                  value={createName}
+                  onChange={(e) => {
+                    setCreateName(e.target.value)
+                    setCreateMessage(null)
+                  }}
+                  disabled={createSaving}
+                />
+                <span style={{ fontSize: '11px', color: '#64748b', marginTop: '4px', display: 'block' }}>
+                  必须以 <code>.md</code> 结尾。系统会自动在模板中填入基础托管块标记。
+                </span>
+              </div>
+
+              {createMessage && (
+                <div
+                  className="empty-state"
+                  style={{
+                    marginTop: '12px',
+                    padding: '10px 12px',
+                    fontSize: '13px',
+                    background: '#ffebe9',
+                    color: '#cf222e',
+                    border: '1px solid #ffc8c4',
+                  }}
+                >
+                  {createMessage}
+                </div>
+              )}
+            </div>
+
+            <div className="modal-footer">
+              <button
+                type="button"
+                className="button"
+                onClick={() => setCreateDialogOpen(false)}
+                disabled={createSaving}
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                className="button button-primary"
+                onClick={handleCreateTemplate}
+                disabled={createSaving || !createName.trim()}
+              >
+                {createSaving ? '创建中…' : '确认创建'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {rules.length === 0 ? (
         <div className="empty-state">未注册任何 Rule 模板。</div>
       ) : (
         <div className="skill-list">
           {rules.map((rule) => {
-            const isOpen = !!expandedAgents[rule.agent]
+            const tKey = `${rule.agent}:${rule.name}`
+            const isOpen = !!expandedAgents[tKey]
             return (
-              <div key={rule.agent} className="skill-row" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
+              <div key={tKey} className="skill-row" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
                 <div className="skill-left" style={{ paddingRight: 0 }}>
                   <div className="skill-name-row">
                     <h4 className="skill-title">{rule.name}</h4>
@@ -442,7 +584,7 @@ export function RulesPage() {
                       fontFamily: 'monospace',
                       fontSize: '12px',
                       marginTop: '6px',
-                      wordBreak: 'break-all'
+                      wordBreak: 'break-all',
                     }}
                     title={rule.localPath}
                   >
@@ -458,11 +600,9 @@ export function RulesPage() {
                         cursor: 'pointer',
                         padding: 0,
                         fontSize: '12px',
-                        textDecoration: 'underline'
+                        textDecoration: 'underline',
                       }}
-                      onClick={() =>
-                        setExpandedAgents((s) => ({ ...s, [rule.agent]: !s[rule.agent] }))
-                      }
+                      onClick={() => setExpandedAgents((s) => ({ ...s, [tKey]: !s[tKey] }))}
                     >
                       {isOpen ? '收起已安装项目路径 ▴' : `查看项目级安装路径（${rule.installedPaths.length} 个项目）▾`}
                     </button>
@@ -476,7 +616,7 @@ export function RulesPage() {
                       padding: '12px',
                       background: '#f8fafc',
                       border: '1px solid #e2e8f0',
-                      borderRadius: '6px'
+                      borderRadius: '6px',
                     }}
                   >
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -495,7 +635,7 @@ export function RulesPage() {
                               border: '1px solid #e2e8f0',
                               borderRadius: '6px',
                               padding: '10px 12px',
-                              transition: 'background-color 0.5s ease'
+                              transition: 'background-color 0.5s ease',
                             }}
                           >
                             <div
@@ -503,7 +643,7 @@ export function RulesPage() {
                                 display: 'flex',
                                 gap: '8px',
                                 alignItems: 'center',
-                                padding: '4px 0'
+                                padding: '4px 0',
                               }}
                             >
                               <span
@@ -512,34 +652,93 @@ export function RulesPage() {
                                   ...agentStyle(rule.agent),
                                   flexShrink: 0,
                                   minWidth: '90px',
-                                  textAlign: 'center'
+                                  textAlign: 'center',
                                 }}
                               >
                                 {rule.agent.toUpperCase()} · project
                               </span>
-                              <span style={{ flex: 1, fontSize: '12px', color: '#1e293b' }}>
+                              <span
+                                style={{
+                                  flex: 1,
+                                  fontSize: '12px',
+                                  color: '#1e293b',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '8px',
+                                  flexWrap: 'wrap',
+                                }}
+                              >
                                 <strong>{p.projectName}</strong>
                                 <span
                                   style={{
                                     fontFamily: 'monospace',
                                     color: '#475569',
-                                    marginLeft: '8px',
-                                    wordBreak: 'break-all'
+                                    wordBreak: 'break-all',
                                   }}
                                 >
                                   {p.path}
                                 </span>
-                                <span style={{ marginLeft: '8px', color: p.exists ? '#2f855a' : '#a0aec0', fontSize: '12px' }}>
-                                  {p.exists ? '已存在' : '未创建'}
+                                <span
+                                  style={{
+                                    color: p.exists ? '#2f855a' : '#a0aec0',
+                                  }}
+                                >
+                                  ({p.exists ? '已存在' : '未创建'})
                                 </span>
+                                <span style={{ color: '#64748b', marginLeft: '4px' }}>关联模板:</span>
+                                <select
+                                  style={{
+                                    padding: '2px 4px',
+                                    fontSize: '11px',
+                                    borderRadius: '4px',
+                                    border: '1px solid #cbd5e1',
+                                    background: '#ffffff',
+                                    cursor: 'pointer',
+                                  }}
+                                  value={rule.name}
+                                  onChange={async (e) => {
+                                    const newTplName = e.target.value
+                                    try {
+                                      await apiPut(`/api/projects/${p.projectId}/rules/template`, {
+                                        agent: rule.agent,
+                                        templateName: newTplName,
+                                      })
+                                      await refetch()
+                                      // Recalculate diff for the new combination
+                                      const newKey = keyFor(rule.agent, p.projectId)
+                                      setDiffByKey((s) => ({ ...s, [newKey]: null }))
+                                      await loadDiff(rule.agent, p.projectId)
+                                    } catch (err) {
+                                      alert(`绑定模板失败: ${(err as Error).message}`)
+                                    }
+                                  }}
+                                >
+                                  {rules
+                                    .filter((r: any) => r.agent === rule.agent)
+                                    .map((r: any) => (
+                                      <option key={r.name} value={r.name}>
+                                        {r.name}
+                                      </option>
+                                    ))}
+                                </select>
                               </span>
                               <button
                                 className="button"
                                 style={{ padding: '4px 8px', fontSize: '12px', border: '1px solid #cbd5e1' }}
-                                onClick={() => loadDiff(rule.agent, p.projectId)}
+                                onClick={() => {
+                                  if (showDiffByKey[k]) {
+                                    setShowDiffByKey((s) => ({ ...s, [k]: false }))
+                                  } else {
+                                    if (diffByKey[k]) {
+                                      setShowDiffByKey((s) => ({ ...s, [k]: true }))
+                                    } else {
+                                      loadDiff(rule.agent, p.projectId)
+                                    }
+                                  }
+                                }}
                                 disabled={!!loadingDiff[k]}
                               >
-                                {loadingDiff[k] ? '加载中…' : '查看 Diff'}
+                                {loadingDiff[k] ? '加载中…' : showDiffByKey[k] ? '收起 Diff' : '查看 Diff'}
                               </button>
                               <button
                                 className="button"
@@ -565,19 +764,19 @@ export function RulesPage() {
                               </button>
                             </div>
 
-                            {plan && (
+                            {showDiffByKey[k] && plan && (
                               <div style={{ marginTop: '8px', fontSize: '12px' }}>
                                 <span className={`badge ${sb.className}`}>{sb.label}</span>
                               </div>
                             )}
-                            {plan?.patch && (
+                            {showDiffByKey[k] && plan?.patch && (
                               <div
                                 style={{
                                   marginTop: '8px',
                                   maxHeight: '200px',
                                   overflowY: 'auto',
                                   border: '1px solid #e2e8f0',
-                                  borderRadius: '4px'
+                                  borderRadius: '4px',
                                 }}
                               >
                                 <DiffView diff={plan.patch} />
@@ -592,7 +791,7 @@ export function RulesPage() {
                                   background: msg.startsWith('[成功]') ? '#dafbe1' : '#ffebe9',
                                   border: msg.startsWith('[成功]') ? '1px solid #c4f2d2' : '1px solid #ffc8c4',
                                   padding: '6px 10px',
-                                  borderRadius: '4px'
+                                  borderRadius: '4px',
                                 }}
                               >
                                 {msg}
@@ -621,31 +820,36 @@ export function RulesPage() {
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
+          boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
         }}
       >
         <div>
-          <h4 style={{ margin: 0, fontSize: '15px', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <h4
+            style={{ margin: 0, fontSize: '15px', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}
+          >
             <span>🔍 扫描项目规则文件变化（仅检测）</span>
             {isScanningRules && (
               <span style={{ fontSize: '12px', color: '#2563eb', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <span 
-                  style={{ 
-                    width: '6px', 
-                    height: '6px', 
-                    borderRadius: '50%', 
+                <span
+                  style={{
+                    width: '6px',
+                    height: '6px',
+                    borderRadius: '50%',
                     background: '#2563eb',
                     display: 'inline-block',
-                    animation: 'pulse 1.5s infinite' 
-                  }} 
+                    animation: 'pulse 1.5s infinite',
+                  }}
                 />
                 正在扫描...
               </span>
             )}
           </h4>
           <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#64748b' }}>
-            手动点按右侧按钮，后台将即时比对所有已注册项目下的规则文件（CLAUDE.md / AGENTS.md / GEMINI.md）与本地权威模板的差异。
-            {scanFinishedMessage && <span style={{ color: '#1a7f37', marginLeft: '8px', fontWeight: 500 }}>{scanFinishedMessage}</span>}
+            手动点按右侧按钮，后台将即时比对所有已注册项目下的规则文件（CLAUDE.md / AGENTS.md /
+            GEMINI.md）与本地权威模板的差异。
+            {scanFinishedMessage && (
+              <span style={{ color: '#1a7f37', marginLeft: '8px', fontWeight: 500 }}>{scanFinishedMessage}</span>
+            )}
           </p>
         </div>
         <div>
@@ -661,7 +865,7 @@ export function RulesPage() {
               border: '1px solid #2563eb',
               background: '#2563eb',
               color: '#ffffff',
-              cursor: isScanningRules ? 'not-allowed' : 'pointer'
+              cursor: isScanningRules ? 'not-allowed' : 'pointer',
             }}
           >
             {isScanningRules ? '扫描中...' : '🔍 执行规则扫描'}
@@ -672,151 +876,144 @@ export function RulesPage() {
       {/* Cross-agent sync matrix — per project */}
       {rules.length > 0 && rules[0].installedPaths.length > 0 && (
         <div style={{ marginTop: '32px' }}>
-          <h3 style={{ fontSize: '16px', color: '#17202a', marginBottom: '8px' }}>
-            项目内跨 Agent 互推
-          </h3>
+          <h3 style={{ fontSize: '16px', color: '#17202a', marginBottom: '8px' }}>项目内跨 Agent 互推</h3>
           <p style={{ color: '#57606a', fontSize: '13px', marginBottom: '16px' }}>
             在同一项目内的 3 个 Agent 规则文件之间互相同步：选择源 Agent → 目标 Agent，
             把源文件中的内容（块模式提取，受控块；覆写模式整文件）推到目标 Agent 的项目级规则文件中。
             写入前会自动备份目标文件。
           </p>
 
-          {Array.from(
-            new Map(rules[0].installedPaths.map((p: InstalledPath) => [p.projectId, p])).values()
-          ).map((proj: any) => {
-            const isOpen = !!crossExpanded[proj.projectId]
-            return (
-              <div
-                key={proj.projectId}
-                style={{
-                  background: '#ffffff',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '6px',
-                  marginBottom: '12px'
-                }}
-              >
+          {Array.from(new Map(rules[0].installedPaths.map((p: InstalledPath) => [p.projectId, p])).values()).map(
+            (proj: any) => {
+              const isOpen = !!crossExpanded[proj.projectId]
+              return (
                 <div
+                  key={proj.projectId}
                   style={{
-                    padding: '10px 14px',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    borderBottom: isOpen ? '1px solid #e2e8f0' : 'none'
+                    background: '#ffffff',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '6px',
+                    marginBottom: '12px',
                   }}
                 >
-                  <div>
-                    <strong>{proj.projectName}</strong>
-                    <span
-                      style={{
-                        fontFamily: 'monospace',
-                        color: '#475569',
-                        marginLeft: '8px',
-                        fontSize: '12px'
-                      }}
-                    >
-                      {proj.path}
-                    </span>
-                  </div>
-                  <button
-                    type="button"
+                  <div
                     style={{
-                      background: 'transparent',
-                      border: 'none',
-                      color: '#2563eb',
-                      cursor: 'pointer',
-                      fontSize: '12px',
-                      textDecoration: 'underline'
+                      padding: '10px 14px',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      borderBottom: isOpen ? '1px solid #e2e8f0' : 'none',
                     }}
-                    onClick={() =>
-                      setCrossExpanded((s) => ({ ...s, [proj.projectId]: !s[proj.projectId] }))
-                    }
                   >
-                    {isOpen ? '收起互推矩阵 ▴' : '展开互推矩阵 ▾'}
-                  </button>
-                </div>
+                    <div>
+                      <strong>{proj.projectName}</strong>
+                      <span
+                        style={{
+                          fontFamily: 'monospace',
+                          color: '#475569',
+                          marginLeft: '8px',
+                          fontSize: '12px',
+                        }}
+                      >
+                        {proj.path}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: '#2563eb',
+                        cursor: 'pointer',
+                        fontSize: '12px',
+                        textDecoration: 'underline',
+                      }}
+                      onClick={() => setCrossExpanded((s) => ({ ...s, [proj.projectId]: !s[proj.projectId] }))}
+                    >
+                      {isOpen ? '收起互推矩阵 ▴' : '展开互推矩阵 ▾'}
+                    </button>
+                  </div>
 
-                {isOpen && (
-                  <div style={{ padding: '12px 14px' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                      <thead>
-                        <tr>
-                          <th style={{ textAlign: 'left', padding: '6px', color: '#475569' }}>源 \ 目标</th>
-                          {AGENTS.map((a) => (
-                            <th key={a} style={{ textAlign: 'center', padding: '6px' }}>
-                              <span className="skill-tag" style={agentStyle(a)}>
-                                {a.toUpperCase()}
-                              </span>
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {AGENTS.map((src) => (
-                          <tr key={src}>
-                            <td style={{ padding: '6px' }}>
-                              <span className="skill-tag" style={agentStyle(src)}>
-                                {src.toUpperCase()}
-                              </span>
-                            </td>
-                            {AGENTS.map((tgt) => {
-                              if (src === tgt) {
+                  {isOpen && (
+                    <div style={{ padding: '12px 14px' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                        <thead>
+                          <tr>
+                            <th style={{ textAlign: 'left', padding: '6px', color: '#475569' }}>源 \ 目标</th>
+                            {AGENTS.map((a) => (
+                              <th key={a} style={{ textAlign: 'center', padding: '6px' }}>
+                                <span className="skill-tag" style={agentStyle(a)}>
+                                  {a.toUpperCase()}
+                                </span>
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {AGENTS.map((src) => (
+                            <tr key={src}>
+                              <td style={{ padding: '6px' }}>
+                                <span className="skill-tag" style={agentStyle(src)}>
+                                  {src.toUpperCase()}
+                                </span>
+                              </td>
+                              {AGENTS.map((tgt) => {
+                                if (src === tgt) {
+                                  return (
+                                    <td key={tgt} style={{ textAlign: 'center', color: '#a0aec0', fontSize: '12px' }}>
+                                      —
+                                    </td>
+                                  )
+                                }
+                                const k = `cross:${proj.projectId}:${src}->${tgt}`
+                                const msg = crossMessage[k]
+                                const busy = !!crossInProgress[k]
                                 return (
-                                  <td
-                                    key={tgt}
-                                    style={{ textAlign: 'center', color: '#a0aec0', fontSize: '12px' }}
-                                  >
-                                    —
+                                  <td key={tgt} style={{ textAlign: 'center', padding: '6px' }}>
+                                    <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
+                                      <button
+                                        className="button"
+                                        style={{ padding: '2px 8px', fontSize: '12px', border: '1px solid #cbd5e1' }}
+                                        onClick={() => handleCrossSync(proj.projectId, src, tgt, 'block')}
+                                        disabled={busy}
+                                        title="块模式：复用源文件受控块，推入目标 Agent 的受控块"
+                                      >
+                                        block
+                                      </button>
+                                      <button
+                                        className="button"
+                                        style={{ padding: '2px 8px', fontSize: '12px' }}
+                                        onClick={() => handleCrossSync(proj.projectId, src, tgt, 'overwrite')}
+                                        disabled={busy}
+                                        title="覆写模式：源文件整文件覆写目标"
+                                      >
+                                        overwrite
+                                      </button>
+                                    </div>
+                                    {msg && (
+                                      <div
+                                        style={{
+                                          marginTop: '4px',
+                                          fontSize: '11px',
+                                          color: msg.startsWith('[成功]') ? '#1a7f37' : '#cf222e',
+                                        }}
+                                      >
+                                        {msg}
+                                      </div>
+                                    )}
                                   </td>
                                 )
-                              }
-                              const k = `cross:${proj.projectId}:${src}->${tgt}`
-                              const msg = crossMessage[k]
-                              const busy = !!crossInProgress[k]
-                              return (
-                                <td key={tgt} style={{ textAlign: 'center', padding: '6px' }}>
-                                  <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
-                                    <button
-                                      className="button"
-                                      style={{ padding: '2px 8px', fontSize: '12px', border: '1px solid #cbd5e1' }}
-                                      onClick={() => handleCrossSync(proj.projectId, src, tgt, 'block')}
-                                      disabled={busy}
-                                      title="块模式：复用源文件受控块，推入目标 Agent 的受控块"
-                                    >
-                                      block
-                                    </button>
-                                    <button
-                                      className="button"
-                                      style={{ padding: '2px 8px', fontSize: '12px' }}
-                                      onClick={() => handleCrossSync(proj.projectId, src, tgt, 'overwrite')}
-                                      disabled={busy}
-                                      title="覆写模式：源文件整文件覆写目标"
-                                    >
-                                      overwrite
-                                    </button>
-                                  </div>
-                                  {msg && (
-                                    <div
-                                      style={{
-                                        marginTop: '4px',
-                                        fontSize: '11px',
-                                        color: msg.startsWith('[成功]') ? '#1a7f37' : '#cf222e'
-                                      }}
-                                    >
-                                      {msg}
-                                    </div>
-                                  )}
-                                </td>
-                              )
-                            })}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            )
-          })}
+                              })}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )
+            },
+          )}
         </div>
       )}
     </section>

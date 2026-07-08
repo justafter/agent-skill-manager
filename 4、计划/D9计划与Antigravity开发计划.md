@@ -74,6 +74,7 @@
 ### 3.1 自动化测试
 
 在 `tests/integration/watch.test.ts` 中完成：
+
 - Skill watch 启动后，模拟 Skill `localPath` 下文件变更 → 防抖 → 自动 plan → apply 成功。
 - Skill watch 启动后，apply 失败 → 错误写入 logger，进程不退出。
 - Rule scan 触发后，模拟 `<project>/CLAUDE.md` 差异 → 正确返回变更记录；`applyRuleSync` 计数为 0。

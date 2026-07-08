@@ -4,6 +4,7 @@ import { loadRegistry } from '../core/registry.js'
 import { createAdapters } from '../adapters/registry.js'
 import { identifySkillState } from '../adapters/scan.js'
 import { scanDevelopmentSkills } from '../core/development-scan.js'
+import { resolveCanonicalSkillStates } from '../core/canonical-skill.js'
 import { pathExists } from '../utils/fs.js'
 import type { TargetKey, AgentId } from '../types/adapter.js'
 
@@ -17,10 +18,10 @@ export function registerScanCommand(program: Command): void {
         const registry = await loadRegistry()
         const adapters = createAdapters(config)
         const skills = Object.values(registry.skills)
+        const canonicalSkills = await resolveCanonicalSkillStates(skills)
+        const canonicalSkillMap = new Map(canonicalSkills.map((skill) => [skill.name, skill]))
 
-        const enabledAgents = (Object.keys(adapters) as AgentId[]).filter(
-          (agent) => config.targets[agent]?.enabled
-        )
+        const enabledAgents = (Object.keys(adapters) as AgentId[]).filter((agent) => config.targets[agent]?.enabled)
 
         if (enabledAgents.length === 0) {
           console.log('No targets enabled in configuration.')
@@ -36,18 +37,16 @@ export function registerScanCommand(program: Command): void {
           const adapter = adapters[agent]
           const targetKey: TargetKey = `${agent}:user`
           const userPath = adapter.getTargetPaths().userSkillPath
-          
+
           const detected = userPath ? await pathExists(userPath) : false
           detectedTargets[targetKey] = detected
 
           if (detected) {
             const targetSkills = await adapter.scanUserSkills()
             scannedTargets[targetKey] = targetSkills
-            
+
             // Find untracked
-            untracked[targetKey] = Object.keys(targetSkills).filter(
-              (name) => !registry.skills[name]
-            )
+            untracked[targetKey] = Object.keys(targetSkills).filter((name) => !registry.skills[name])
           } else {
             console.log(`[-] 未检测到 ${agent} 用户级 Skill 目录 (路径: ${userPath || '(未配置)'})`)
             scannedTargets[targetKey] = {}
@@ -66,10 +65,13 @@ export function registerScanCommand(program: Command): void {
             const dev = development[skill.name]
             if (dev) {
               const devMessage =
-                dev.status === 'identical' ? 'identical' :
-                dev.status === 'changed' ? `changed (checksum: ${dev.checksum?.slice(0, 19)}...)` :
-                dev.status === 'missing' ? 'missing' :
-                `invalid (${dev.error})`
+                dev.status === 'identical'
+                  ? 'identical'
+                  : dev.status === 'changed'
+                    ? `changed (checksum: ${dev.checksum?.slice(0, 19)}...)`
+                    : dev.status === 'missing'
+                      ? 'missing'
+                      : `invalid (${dev.error})`
               console.log(`  - development: ${devMessage}`)
             }
             for (const agent of enabledAgents) {
@@ -78,8 +80,8 @@ export function registerScanCommand(program: Command): void {
                 console.log(`  - ${targetKey}: missing (target directory not detected)`)
               } else {
                 const targetSkillInfo = scannedTargets[targetKey][skill.name]
-                const status = identifySkillState(skill, targetSkillInfo)
-                const tagInfo = targetSkillInfo?.deployTag 
+                const status = identifySkillState(canonicalSkillMap.get(skill.name), targetSkillInfo)
+                const tagInfo = targetSkillInfo?.deployTag
                   ? ` [DeployTag: hash=${targetSkillInfo.deployTag.sourceHash.slice(0, 8)}, date=${targetSkillInfo.deployTag.deployedAt}]`
                   : ''
                 console.log(`  - ${targetKey}: ${status}${tagInfo}`)

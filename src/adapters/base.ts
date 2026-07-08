@@ -8,7 +8,7 @@ import { readDeployTag } from '../sync/deploy-tag.js'
 export abstract class BaseAdapter implements Adapter {
   protected constructor(
     readonly agent: AgentId,
-    private readonly paths: AdapterTargetPaths
+    private readonly paths: AdapterTargetPaths,
   ) {}
 
   async detect(): Promise<boolean> {
@@ -42,7 +42,7 @@ export abstract class BaseAdapter implements Adapter {
               localPath: skillDir,
               checksum,
               deployTag,
-              detected: true
+              detected: true,
             }
           }
         }

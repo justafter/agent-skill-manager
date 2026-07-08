@@ -39,9 +39,7 @@ export function SkillsPage() {
   const [importForce, setImportForce] = useState(false)
   const [importSkip, setImportSkip] = useState(false)
   const [isImporting, setIsImporting] = useState(false)
-  const [importFeedback, setImportFeedback] = useState<
-    { type: 'success' | 'error'; message: string } | null
-  >(null)
+  const [importFeedback, setImportFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
   // Sync state
   const [planDialogOpen, setPlanDialogOpen] = useState(false)
@@ -72,7 +70,7 @@ export function SkillsPage() {
     toTarget?: string,
     fromTarget?: string,
     currentModifyVal = false,
-    currentOverwriteVal = allowConflictOverwrite
+    currentOverwriteVal = allowConflictOverwrite,
   ) => {
     try {
       setIsSubmittingPlan(true)
@@ -89,7 +87,7 @@ export function SkillsPage() {
         targets: !isPull && toTarget ? [toTarget] : undefined,
         from: isPull ? fromTarget : undefined,
         allowManagedModify: currentModifyVal,
-        allowConflictOverwrite: !isPull ? currentOverwriteVal : false
+        allowConflictOverwrite: !isPull ? currentOverwriteVal : false,
       }
 
       const res = await apiPost<PlanResult>('/api/sync/plan', body)
@@ -124,7 +122,7 @@ export function SkillsPage() {
       await apiPost('/api/sync/apply', {
         planId: planResult.plan.planId,
         allowManagedModify,
-        allowConflictOverwrite
+        allowConflictOverwrite,
       })
       setPlanDialogOpen(false)
       setPlanResult(null)
@@ -142,7 +140,7 @@ export function SkillsPage() {
       const res = await apiPost<any>('/api/import', {
         path,
         force: false,
-        skip: true
+        skip: true,
       })
       alert(`[成功] 已成功导入并托管技能: ${res.skill.name}`)
       await refetch()
@@ -155,9 +153,7 @@ export function SkillsPage() {
 
   const handleRefreshFromLocal = async (skill: any) => {
     if (!skill.localPath) return
-    const confirmed = window.confirm(
-      `确定要用导入目录中的最新内容更新本地库吗？\n\n${skill.localPath}`
-    )
+    const confirmed = window.confirm(`确定要用导入目录中的最新内容更新本地库吗？\n\n${skill.localPath}`)
     if (!confirmed) return
 
     try {
@@ -165,7 +161,7 @@ export function SkillsPage() {
       await apiPost('/api/import', {
         path: skill.localPath,
         force: true,
-        skip: false
+        skip: false,
       })
       const scanResult = await apiPost<any>('/api/scan')
       setDevelopmentBySkill(scanResult.development || {})
@@ -186,18 +182,18 @@ export function SkillsPage() {
       const res = await apiPost<any>('/api/import', {
         path: importPath.trim(),
         force: importForce,
-        skip: importSkip
+        skip: importSkip,
       })
       setImportFeedback(
         res.skipped
           ? {
               type: 'success',
-              message: `[跳过] 由于已存在相同校验和的 Skill，跳过导入 "${res.skill.name}"。`
+              message: `[跳过] 由于已存在相同校验和的 Skill，跳过导入 "${res.skill.name}"。`,
             }
           : {
               type: 'success',
-              message: `[成功] Skill "${res.skill.name}" (v${res.skill.version}) 已成功导入到本地库！`
-            }
+              message: `[成功] Skill "${res.skill.name}" (v${res.skill.version}) 已成功导入到本地库！`,
+            },
       )
       setImportPath('')
       setImportForce(false)
@@ -206,7 +202,7 @@ export function SkillsPage() {
     } catch (err) {
       setImportFeedback({
         type: 'error',
-        message: `导入失败: ${(err as Error).message}`
+        message: `导入失败: ${(err as Error).message}`,
       })
     } finally {
       setIsImporting(false)
@@ -222,7 +218,11 @@ export function SkillsPage() {
   }
 
   if (isLoading || !config || !skillsData) {
-    return <div className="page"><div className="empty-state">正在加载 Skill...</div></div>
+    return (
+      <div className="page">
+        <div className="empty-state">正在加载 Skill...</div>
+      </div>
+    )
   }
 
   const enabledTargets = Object.entries(config.targets)
@@ -251,45 +251,33 @@ export function SkillsPage() {
       <div className="toolbar">
         <h2>Skill 库</h2>
         <div style={{ display: 'flex', gap: '8px' }}>
-          <button
-            className="button"
-            type="button"
-            onClick={() => setImportDialogOpen(true)}
-          >
+          <button className="button" type="button" onClick={() => setImportDialogOpen(true)}>
             导入技能
           </button>
-          <button
-            className="button button-primary"
-            type="button"
-            onClick={handleScan}
-            disabled={isScanning}
-          >
+          <button className="button button-primary" type="button" onClick={handleScan} disabled={isScanning}>
             {isScanning ? '正在检查...' : '检查更新'}
           </button>
         </div>
       </div>
 
       <div className="filter-bar">
-        <button 
-          className={`filter-pill ${activeTab === 'all' ? 'active' : ''}`} 
-          onClick={() => setActiveTab('all')}
-        >
+        <button className={`filter-pill ${activeTab === 'all' ? 'active' : ''}`} onClick={() => setActiveTab('all')}>
           已安装
         </button>
-        <button 
-          className={`filter-pill filter-claude ${activeTab === 'claude:user' ? 'active' : ''}`} 
+        <button
+          className={`filter-pill filter-claude ${activeTab === 'claude:user' ? 'active' : ''}`}
           onClick={() => setActiveTab('claude:user')}
         >
           Claude: <strong>{getAgentCount('claude:user')}</strong>
         </button>
-        <button 
-          className={`filter-pill filter-codex ${activeTab === 'codex:user' ? 'active' : ''}`} 
+        <button
+          className={`filter-pill filter-codex ${activeTab === 'codex:user' ? 'active' : ''}`}
           onClick={() => setActiveTab('codex:user')}
         >
           Codex: <strong>{getAgentCount('codex:user')}</strong>
         </button>
-        <button 
-          className={`filter-pill filter-gemini ${activeTab === 'gemini:user' ? 'active' : ''}`} 
+        <button
+          className={`filter-pill filter-gemini ${activeTab === 'gemini:user' ? 'active' : ''}`}
           onClick={() => setActiveTab('gemini:user')}
         >
           Gemini: <strong>{getAgentCount('gemini:user')}</strong>
@@ -335,9 +323,9 @@ export function SkillsPage() {
             <p style={{ color: '#57606a', fontSize: '13px', marginBottom: '16px' }}>
               以下技能存在于目标 Agent 的用户目录下，但尚未登记到本地管理器中。您可以一键导入进行统一管理。
             </p>
-            
+
             <div className="skill-list">
-              {Object.entries(untracked).flatMap(([targetKey, list]: any) => 
+              {Object.entries(untracked).flatMap(([targetKey, list]: any) =>
                 list.map((item: any) => {
                   const agentName = targetKey.split(':')[0]
                   return (
@@ -345,17 +333,19 @@ export function SkillsPage() {
                       <div className="skill-left">
                         <div className="skill-name-row">
                           <h4 className="skill-title">{item.name}</h4>
-                          <span className="skill-tag" style={{ background: '#e1f5fe', color: '#0288d1' }}>未托管</span>
-                          <span 
-                            className="skill-tag" 
+                          <span className="skill-tag" style={{ background: '#e1f5fe', color: '#0288d1' }}>
+                            未托管
+                          </span>
+                          <span
+                            className="skill-tag"
                             style={
-                              agentName === 'claude' 
-                                ? { background: '#fdf0ec', color: '#c05621' } 
-                                : agentName === 'codex' 
-                                ? { background: '#ebfbee', color: '#2f855a' } 
-                                : agentName === 'gemini' 
-                                ? { background: '#ebf8ff', color: '#2b6cb0' } 
-                                : { background: '#faf5ff', color: '#6b46c1' }
+                              agentName === 'claude'
+                                ? { background: '#fdf0ec', color: '#c05621' }
+                                : agentName === 'codex'
+                                  ? { background: '#ebfbee', color: '#2f855a' }
+                                  : agentName === 'gemini'
+                                    ? { background: '#ebf8ff', color: '#2b6cb0' }
+                                    : { background: '#faf5ff', color: '#6b46c1' }
                             }
                           >
                             来自 {agentName}
@@ -377,7 +367,7 @@ export function SkillsPage() {
                       </div>
                     </div>
                   )
-                })
+                }),
               )}
             </div>
           </div>
@@ -408,7 +398,9 @@ export function SkillsPage() {
               <div className="modal-body">
                 <p style={{ color: '#57606a', fontSize: '13px', marginBottom: '16px' }}>
                   请输入要导入的 Skill 绝对目录路径。管理器会在写入本地库前校验其
-                  <code style={{ background: '#f1f5f9', padding: '0 4px', borderRadius: '3px', margin: '0 4px' }}>SKILL.md</code>
+                  <code style={{ background: '#f1f5f9', padding: '0 4px', borderRadius: '3px', margin: '0 4px' }}>
+                    SKILL.md
+                  </code>
                   的 Frontmatter 元数据。
                 </p>
 
@@ -433,7 +425,7 @@ export function SkillsPage() {
                     display: 'flex',
                     flexDirection: 'column',
                     gap: '8px',
-                    marginTop: '12px'
+                    marginTop: '12px',
                   }}
                 >
                   <label
@@ -443,7 +435,7 @@ export function SkillsPage() {
                       gap: '8px',
                       cursor: 'pointer',
                       margin: 0,
-                      fontWeight: 500
+                      fontWeight: 500,
                     }}
                   >
                     <input
@@ -462,7 +454,7 @@ export function SkillsPage() {
                       gap: '8px',
                       cursor: 'pointer',
                       margin: 0,
-                      fontWeight: 500
+                      fontWeight: 500,
                     }}
                   >
                     <input
@@ -484,10 +476,7 @@ export function SkillsPage() {
                       fontSize: '13px',
                       background: importFeedback.type === 'success' ? '#dafbe1' : '#ffebe9',
                       color: importFeedback.type === 'success' ? '#1a7f37' : '#cf222e',
-                      border:
-                        importFeedback.type === 'success'
-                          ? '1px solid #c4f2d2'
-                          : '1px solid #ffc8c4'
+                      border: importFeedback.type === 'success' ? '1px solid #c4f2d2' : '1px solid #ffc8c4',
                     }}
                   >
                     {importFeedback.message}
@@ -496,19 +485,10 @@ export function SkillsPage() {
               </div>
 
               <div className="modal-footer">
-                <button
-                  type="button"
-                  className="button"
-                  onClick={closeImportDialog}
-                  disabled={isImporting}
-                >
+                <button type="button" className="button" onClick={closeImportDialog} disabled={isImporting}>
                   取消
                 </button>
-                <button
-                  type="submit"
-                  className="button button-primary"
-                  disabled={isImporting || !importPath.trim()}
-                >
+                <button type="submit" className="button button-primary" disabled={isImporting || !importPath.trim()}>
                   {isImporting ? '正在导入...' : '导入 Skill'}
                 </button>
               </div>

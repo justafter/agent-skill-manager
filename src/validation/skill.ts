@@ -30,6 +30,6 @@ export async function parseSkillDir(localPath: string): Promise<SkillMeta> {
     hasScripts: await pathExists(path.join(localPath, 'scripts')),
     hasReferences: await pathExists(path.join(localPath, 'references')),
     hasAssets: await pathExists(path.join(localPath, 'assets')),
-    lastModified: await collectLastModified(localPath)
+    lastModified: await collectLastModified(localPath),
   }
 }

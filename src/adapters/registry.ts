@@ -8,6 +8,6 @@ export function createAdapters(config: ResolvedConfig): Record<AgentId, Adapter>
   return {
     claude: new ClaudeAdapter(config.targets.claude),
     codex: new CodexAdapter(config.targets.codex),
-    gemini: new GeminiAntigravityAdapter(config.targets.gemini)
+    gemini: new GeminiAntigravityAdapter(config.targets.gemini),
   }
 }

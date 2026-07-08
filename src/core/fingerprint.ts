@@ -15,6 +15,6 @@ export async function fingerprintDirectory(targetPath: string): Promise<Director
   return {
     path: path.resolve(targetPath),
     checksum,
-    lastModified: info.mtime.toISOString()
+    lastModified: info.mtime.toISOString(),
   }
 }

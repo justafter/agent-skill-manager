@@ -3,7 +3,7 @@ import { createManualBackup, listBackups } from '../../backup/create.js'
 
 export function backupRouter(): Router {
   const router = Router()
-  
+
   router.get('/', async (_req, res, next) => {
     try {
       const list = await listBackups()

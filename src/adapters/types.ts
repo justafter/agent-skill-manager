@@ -5,5 +5,5 @@ export type {
   Scope,
   TargetKey,
   TargetSkillInfo,
-  DeployTag
+  DeployTag,
 } from '../types/adapter.js'

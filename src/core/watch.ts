@@ -13,7 +13,10 @@ import { expandUserProfile } from '../utils/paths.js'
 // Map of skillName -> FSWatcher
 const activeWatchers = new Map<string, chokidar.FSWatcher>()
 // Map of skillName -> last sync status for UI
-const watchStatus = new Map<string, { lastSyncedAt: string; status: 'watching' | 'success' | 'error'; error?: string }>()
+const watchStatus = new Map<
+  string,
+  { lastSyncedAt: string; status: 'watching' | 'success' | 'error'; error?: string }
+>()
 
 export function getWatchStatus(skillName: string) {
   return watchStatus.get(skillName) || null
@@ -22,7 +25,7 @@ export function getWatchStatus(skillName: string) {
 export function getAllWatchStatuses() {
   return Array.from(watchStatus.entries()).map(([skillName, status]) => ({
     skillName,
-    ...status
+    ...status,
   }))
 }
 
@@ -37,11 +40,7 @@ async function logWatchError(skillName: string, error: string): Promise<void> {
   }
 }
 
-export async function startWatch(
-  skillName: string,
-  targetList?: string[],
-  root = process.cwd()
-): Promise<void> {
+export async function startWatch(skillName: string, targetList?: string[], root = process.cwd()): Promise<void> {
   if (activeWatchers.has(skillName)) {
     return // Already watching
   }
@@ -77,7 +76,7 @@ export async function startWatch(
 
   watchStatus.set(skillName, {
     lastSyncedAt: new Date().toISOString(),
-    status: 'watching'
+    status: 'watching',
   })
 
   // Write PID file
@@ -87,7 +86,7 @@ export async function startWatch(
   const watcher = chokidar.watch(devDir, {
     ignored: /(^|[\/\\])\../, // ignore dotfiles
     persistent: true,
-    ignoreInitial: true
+    ignoreInitial: true,
   })
 
   let isSyncing = false
@@ -111,7 +110,7 @@ export async function startWatch(
       isSyncing = true
       try {
         console.log(`[Watch] Syncing skill "${skillName}" to targets: ${resolvedTargets.join(', ')}`)
-        
+
         // 1. Re-import from dev directory into canonical library
         await importSkill(devDir, { force: true }, root)
 
@@ -140,7 +139,7 @@ export async function startWatch(
 
         watchStatus.set(skillName, {
           lastSyncedAt: new Date().toISOString(),
-          status: 'success'
+          status: 'success',
         })
         console.log(`[Watch] Skill "${skillName}" synced successfully.`)
       } catch (err) {
@@ -149,7 +148,7 @@ export async function startWatch(
         watchStatus.set(skillName, {
           lastSyncedAt: new Date().toISOString(),
           status: 'error',
-          error: errMsg
+          error: errMsg,
         })
         await logWatchError(skillName, errMsg)
       } finally {
@@ -189,7 +188,7 @@ let ruleScanChanges: Array<{ projectId: string; agent: string; lastDetectedAt: s
 
 export function getRuleScanStatus() {
   return {
-    changes: ruleScanChanges
+    changes: ruleScanChanges,
   }
 }
 
@@ -215,7 +214,7 @@ export async function runRuleScan(root = process.cwd()) {
           newChanges.push({
             projectId: project.id,
             agent,
-            lastDetectedAt: new Date().toISOString()
+            lastDetectedAt: new Date().toISOString(),
           })
         }
       } catch (err) {

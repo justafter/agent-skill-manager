@@ -12,7 +12,7 @@ import { pathExists, ensureDir, atomicWriteJson } from '../utils/fs.js'
 const ruleFileByAgent: Record<AgentId, string> = {
   claude: 'CLAUDE.md',
   codex: 'AGENTS.md',
-  gemini: 'GEMINI.md'
+  gemini: 'GEMINI.md',
 }
 
 export async function applyRuleSync(
@@ -20,7 +20,7 @@ export async function applyRuleSync(
   agent: AgentId,
   mode: 'block' | 'overwrite' | 'pull',
   root = process.cwd(),
-  templateDir?: string
+  templateDir?: string,
 ): Promise<void> {
   const config = await loadConfig(root)
   const project = config.projects.find((p) => p.id === projectId)
@@ -31,9 +31,12 @@ export async function applyRuleSync(
   const fileName = ruleFileByAgent[agent]
   const targetPath = path.join(project.path, fileName)
 
+  const configuredTemplateName = project.ruleTemplates?.[agent]
+  const templateFileName = configuredTemplateName || fileName
+
   const dir = templateDir || path.join(root, 'library', 'rules')
-  const templatePath = path.join(dir, agent, fileName)
-  const template = await loadRuleTemplate(dir, agent)
+  const templatePath = path.join(dir, agent, templateFileName)
+  const template = await loadRuleTemplate(dir, agent, configuredTemplateName)
   const templateContent = template.content.trim()
 
   if (mode === 'pull') {
@@ -58,7 +61,7 @@ export async function applyRuleSync(
       await backupRuleFile(root, config.backupDir, templatePath, `Pull backup for local template: ${agent}`, {
         type: 'rule',
         originalPath: templatePath,
-        targetType: 'user'
+        targetType: 'user',
       })
     }
 
@@ -71,13 +74,19 @@ export async function applyRuleSync(
 
     // Backup project rule file if it exists
     if (await pathExists(targetPath)) {
-      await backupRuleFile(root, config.backupDir, targetPath, `Sync backup for project rules: ${project.name} (${agent})`, {
-        type: 'rule',
-        projectId,
-        originalPath: targetPath,
-        targetType: 'project',
-        targetAgent: agent
-      })
+      await backupRuleFile(
+        root,
+        config.backupDir,
+        targetPath,
+        `Sync backup for project rules: ${project.name} (${agent})`,
+        {
+          type: 'rule',
+          projectId,
+          originalPath: targetPath,
+          targetType: 'project',
+          targetAgent: agent,
+        },
+      )
     }
 
     if (mode === 'overwrite') {
@@ -135,7 +144,7 @@ export async function crossSyncRule(
   sourceAgent: AgentId,
   targetAgent: AgentId,
   mode: CrossSyncMode,
-  root = process.cwd()
+  root = process.cwd(),
 ): Promise<void> {
   if (sourceAgent === targetAgent) {
     throw new Error(`crossSyncRule: sourceAgent and targetAgent must differ (got "${sourceAgent}").`)
@@ -165,13 +174,19 @@ export async function crossSyncRule(
   // Backup target file (the one we're about to mutate)
   await assertSafeWritePath(targetPath, config)
   if (await pathExists(targetPath)) {
-    await backupRuleFile(root, config.backupDir, targetPath, `Cross-sync backup: ${sourceAgent} → ${targetAgent} for project ${project.name}`, {
-      type: 'rule',
-      projectId,
-      originalPath: targetPath,
-      targetType: 'project',
-      targetAgent
-    })
+    await backupRuleFile(
+      root,
+      config.backupDir,
+      targetPath,
+      `Cross-sync backup: ${sourceAgent} → ${targetAgent} for project ${project.name}`,
+      {
+        type: 'rule',
+        projectId,
+        originalPath: targetPath,
+        targetType: 'project',
+        targetAgent,
+      },
+    )
   }
 
   if (mode === 'overwrite') {
@@ -184,7 +199,7 @@ export async function crossSyncRule(
   if (!sourceBlock) {
     throw new Error(
       `crossSyncRule: source file has no managed block for "${sourceAgent}". ` +
-        `Run overwrite mode or add a managed block to ${sourceFile} first.`
+        `Run overwrite mode or add a managed block to ${sourceFile} first.`,
     )
   }
   const targetBlockContent = sourceBlock.content
@@ -218,7 +233,7 @@ async function backupRuleFile(
   backupDir: string,
   originalPath: string,
   reason: string,
-  itemMeta: Partial<BackupItem>
+  itemMeta: Partial<BackupItem>,
 ): Promise<string> {
   const timestamp = Date.now()
   const uuid8 = randomUUID().slice(0, 8)
@@ -237,7 +252,7 @@ async function backupRuleFile(
     items.push({
       type: 'registry',
       originalPath: registryPath,
-      backupPath: backupRegistryPath
+      backupPath: backupRegistryPath,
     })
   }
 
@@ -245,7 +260,7 @@ async function backupRuleFile(
   const fileName = path.basename(originalPath)
   const backupPath = path.join(destDir, itemMeta.targetType === 'project' ? 'project' : 'user', fileName)
   await ensureDir(path.dirname(backupPath))
-  
+
   const content = await readFile(originalPath, 'utf8')
   await writeFile(backupPath, content, 'utf8')
 
@@ -253,14 +268,14 @@ async function backupRuleFile(
     type: 'rule',
     originalPath,
     backupPath,
-    ...itemMeta
+    ...itemMeta,
   })
 
   const index: BackupIndex = {
     backupId,
     createdAt: new Date().toISOString(),
     reason,
-    items
+    items,
   }
 
   await atomicWriteJson(path.join(destDir, 'index.json'), index)

@@ -41,7 +41,7 @@ export function SkillCard({
   onRefreshFromLocal,
   isRefreshingFromLocal,
   watchState,
-  onToggleWatch
+  onToggleWatch,
 }: SkillCardProps) {
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null)
   const [showPaths, setShowPaths] = useState(false)
@@ -72,7 +72,16 @@ export function SkillCard({
     }
     // Fallback
     return (
-      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <svg
+        viewBox="0 0 24 24"
+        width="20"
+        height="20"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
         <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
         <line x1="9" y1="3" x2="9" y2="21" />
       </svg>
@@ -83,7 +92,7 @@ export function SkillCard({
     missing: '缺失',
     identical: '一致',
     changed: '已修改',
-    conflict: '冲突'
+    conflict: '冲突',
   }
 
   const getStatusLabel = (agent: string, stat: string) => {
@@ -109,9 +118,9 @@ export function SkillCard({
     <div className="skill-row">
       {/* Click outside overlay for popovers */}
       {activeDropdown && (
-        <div 
-          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 90, cursor: 'default' }} 
-          onClick={() => setActiveDropdown(null)} 
+        <div
+          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 90, cursor: 'default' }}
+          onClick={() => setActiveDropdown(null)}
         />
       )}
 
@@ -120,7 +129,9 @@ export function SkillCard({
           <h4 className="skill-title">{name}</h4>
           <span className="skill-tag">本地</span>
         </div>
-        <p className="skill-description" title={description}>{description}</p>
+        <p className="skill-description" title={description}>
+          {description}
+        </p>
         {localPath && (
           <p
             className="skill-desc"
@@ -129,7 +140,7 @@ export function SkillCard({
               fontSize: '11px',
               color: '#64748b',
               marginTop: '4px',
-              wordBreak: 'break-all'
+              wordBreak: 'break-all',
             }}
             title={localPath}
           >
@@ -149,7 +160,7 @@ export function SkillCard({
               display: 'flex',
               gap: '10px',
               alignItems: 'center',
-              justifyContent: 'space-between'
+              justifyContent: 'space-between',
             }}
           >
             <span>{developmentMessage}</span>
@@ -178,7 +189,7 @@ export function SkillCard({
                 cursor: 'pointer',
                 padding: 0,
                 fontSize: '12px',
-                textDecoration: 'underline'
+                textDecoration: 'underline',
               }}
             >
               {showPaths ? '收起已安装路径 ▴' : `查看已安装路径（${Object.keys(installedPaths).length} 处）▾`}
@@ -191,7 +202,7 @@ export function SkillCard({
                   background: '#f8fafc',
                   border: '1px solid #e2e8f0',
                   borderRadius: '4px',
-                  fontSize: '12px'
+                  fontSize: '12px',
                 }}
               >
                 {Object.entries(installedPaths).map(([target, path]) => {
@@ -204,23 +215,31 @@ export function SkillCard({
                         display: 'flex',
                         gap: '8px',
                         alignItems: 'center',
-                        padding: '4px 0'
+                        padding: '4px 0',
                       }}
                     >
                       <span
                         className="skill-tag"
                         style={{
                           background:
-                            agent === 'claude' ? '#fdf0ec' :
-                            agent === 'codex' ? '#ebfbee' :
-                            agent === 'gemini' ? '#ebf8ff' : '#faf5ff',
+                            agent === 'claude'
+                              ? '#fdf0ec'
+                              : agent === 'codex'
+                                ? '#ebfbee'
+                                : agent === 'gemini'
+                                  ? '#ebf8ff'
+                                  : '#faf5ff',
                           color:
-                            agent === 'claude' ? '#c05621' :
-                            agent === 'codex' ? '#2f855a' :
-                            agent === 'gemini' ? '#2b6cb0' : '#6b46c1',
+                            agent === 'claude'
+                              ? '#c05621'
+                              : agent === 'codex'
+                                ? '#2f855a'
+                                : agent === 'gemini'
+                                  ? '#2b6cb0'
+                                  : '#6b46c1',
                           flexShrink: 0,
                           minWidth: '90px',
-                          textAlign: 'center'
+                          textAlign: 'center',
                         }}
                       >
                         {agent.toUpperCase()} · {scope}
@@ -231,7 +250,7 @@ export function SkillCard({
                           color: '#1e293b',
                           wordBreak: 'break-all',
                           flex: 1,
-                          minWidth: 0
+                          minWidth: 0,
                         }}
                       >
                         {path}
@@ -263,9 +282,7 @@ export function SkillCard({
                 {renderAgentIcon(agentName)}
 
                 {/* Show a colored dot on top of button if status is changed or conflict */}
-                {(status === 'changed' || status === 'conflict') && (
-                  <span className={`status-dot dot-${status}`} />
-                )}
+                {(status === 'changed' || status === 'conflict') && <span className={`status-dot dot-${status}`} />}
               </button>
 
               {isDropdownOpen && (
@@ -273,7 +290,7 @@ export function SkillCard({
                   <div className="popover-header">
                     <strong>{agentName}</strong> ({getStatusLabel(agentName, status)})
                   </div>
-                  
+
                   <button
                     className="popover-item"
                     onClick={() => {

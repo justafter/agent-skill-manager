@@ -13,10 +13,7 @@ import { registerWatchCommand } from './watch.js'
 
 const program = new Command()
 
-program
-  .name('asm')
-  .description('Agent Skill Manager')
-  .version('0.1.0')
+program.name('asm').description('Agent Skill Manager').version('0.1.0')
 
 registerListCommand(program)
 registerScanCommand(program)

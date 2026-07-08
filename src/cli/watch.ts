@@ -10,7 +10,7 @@ export function registerWatchCommand(program: Command): void {
     .action(async (skillName: string, options: { target?: string }) => {
       try {
         const targetList = options.target ? options.target.split(',').map((t) => t.trim()) : undefined
-        
+
         console.log(`[Watch] Starting Watch Mode for skill "${skillName}"...`)
         await startWatch(skillName, targetList)
         console.log(`[Watch] Watching active. Press Ctrl+C to stop.`)

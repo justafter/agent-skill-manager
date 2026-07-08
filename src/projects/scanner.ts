@@ -18,7 +18,7 @@ export async function scanProject(project: Project): Promise<ProjectScanResult> 
   return {
     projectId: project.id,
     skillDirs: await existing(project.path, skillDirs),
-    ruleFiles: await existing(project.path, ruleFiles)
+    ruleFiles: await existing(project.path, ruleFiles),
   }
 }
 

@@ -20,7 +20,7 @@ export async function planProjectSkillInject(
   project: Project,
   skill: SkillMeta,
   agent: AgentId,
-  root = process.cwd()
+  root = process.cwd(),
 ): Promise<PlanResult> {
   const config = await loadConfig(root)
   const agentConfig = config.targets[agent]
@@ -61,7 +61,7 @@ export async function planProjectSkillInject(
       target: targetDir,
       bytes: sourceBytes,
       targetKey,
-      targetDir
+      targetDir,
     })
   } else {
     // If it exists, let's check deploy tag
@@ -74,7 +74,7 @@ export async function planProjectSkillInject(
         target: targetDir,
         reason: 'identical',
         targetKey,
-        targetDir
+        targetDir,
       })
     } else if (deployTag && deployTag.managedBy === 'AgentSkillManager') {
       items.push({
@@ -83,7 +83,7 @@ export async function planProjectSkillInject(
         checksumBefore: targetChecksum,
         checksumAfter: skill.checksum,
         targetKey,
-        targetDir
+        targetDir,
       })
     } else {
       // Not managed -> Conflict
@@ -93,14 +93,14 @@ export async function planProjectSkillInject(
         checksumBefore: targetChecksum,
         checksumAfter: skill.checksum,
         targetKey,
-        targetDir
+        targetDir,
       })
     }
   }
 
   return createPlan({
     source: canonicalDir,
-    items
+    items,
   })
 }
 
@@ -108,7 +108,7 @@ export async function applyProjectSkillInject(
   planId: PlanId,
   projectId: string,
   options: { allowManagedModify?: boolean } = {},
-  root = process.cwd()
+  root = process.cwd(),
 ): Promise<ApplyResult> {
   const plan = getPlan(planId)
   if (!plan) {
@@ -155,7 +155,14 @@ export async function applyProjectSkillInject(
 
       // 1. Backup if target path exists
       if (await pathExists(targetDir)) {
-        await backupProjectSkill(root, config.backupDir, project, agent, skillName, `Sync inject backup for plan ${planId}`)
+        await backupProjectSkill(
+          root,
+          config.backupDir,
+          project,
+          agent,
+          skillName,
+          `Sync inject backup for plan ${planId}`,
+        )
       }
 
       // 2. Perform write
@@ -166,7 +173,7 @@ export async function applyProjectSkillInject(
       await copyDirectory(plan.source, targetDir)
 
       // 3. Write DeployTag
-      const sourceHash = registry.skills[skillName]?.checksum || await checksumDirectory(plan.source)
+      const sourceHash = registry.skills[skillName]?.checksum || (await checksumDirectory(plan.source))
       await writeDeployTag(targetDir, {
         managedBy: 'AgentSkillManager',
         skillName,
@@ -174,7 +181,7 @@ export async function applyProjectSkillInject(
         sourceHash,
         target: targetKey,
         projectId,
-        deployedAt: new Date().toISOString()
+        deployedAt: new Date().toISOString(),
       })
 
       // 4. Update projectInstalls in registry
@@ -185,7 +192,7 @@ export async function applyProjectSkillInject(
           projectId,
           target: targetKey,
           checksum: sourceHash as `sha256:${string}`,
-          deployedAt: new Date().toISOString()
+          deployedAt: new Date().toISOString(),
         }
         if (existingIdx >= 0) {
           installs[existingIdx] = newInstall
@@ -204,7 +211,7 @@ export async function applyProjectSkillInject(
     return {
       planId,
       applied,
-      skipped
+      skipped,
     }
   } catch (error) {
     try {
@@ -222,7 +229,7 @@ async function backupProjectSkill(
   project: Project,
   agent: AgentId,
   skillName: string,
-  reason: string
+  reason: string,
 ): Promise<string> {
   const config = await loadConfig(root)
   const agentConfig = config.targets[agent]
@@ -252,7 +259,7 @@ async function backupProjectSkill(
     items.push({
       type: 'registry',
       originalPath: registryPath,
-      backupPath: backupRegistryPath
+      backupPath: backupRegistryPath,
     })
   }
 
@@ -271,14 +278,14 @@ async function backupProjectSkill(
     backupPath: backupSkillPath,
     targetType: 'project',
     targetAgent: agent,
-    targetSkillPath
+    targetSkillPath,
   })
 
   const index: BackupIndex = {
     backupId,
     createdAt: new Date().toISOString(),
     reason,
-    items
+    items,
   }
 
   await atomicWriteJson(path.join(destDir, 'index.json'), index)

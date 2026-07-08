@@ -14,14 +14,14 @@ export function createPlan(input: CreatePlanInput): PlanResult {
     createdAt: new Date().toISOString(),
     source: input.source,
     items: input.items ?? [],
-    backupId: input.backupId
+    backupId: input.backupId,
   }
 
   putPlan(plan)
 
   return {
     plan,
-    summary: summarizePlanItems(plan.items)
+    summary: summarizePlanItems(plan.items),
   }
 }
 
@@ -31,7 +31,7 @@ export function summarizePlanItems(items: PlanItem[]): PlanResult['summary'] {
     modify: items.filter((item) => item.kind === 'modify').length,
     skip: items.filter((item) => item.kind === 'skip').length,
     conflict: items.filter((item) => item.kind === 'conflict').length,
-    delete: items.filter((item) => item.kind === 'delete').length
+    delete: items.filter((item) => item.kind === 'delete').length,
   }
 }
 

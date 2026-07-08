@@ -10,7 +10,7 @@ const targetSchema = z.object({
   enabled: z.boolean(),
   userSkillPath: z.string(),
   projectSkillPath: z.string(),
-  projectRuleFile: z.string()
+  projectRuleFile: z.string(),
 })
 
 const configSchema = z.object({
@@ -19,12 +19,12 @@ const configSchema = z.object({
   ruleTemplateDir: z.string(),
   server: z.object({
     host: z.string(),
-    port: z.number().int().positive()
+    port: z.number().int().positive(),
   }),
   targets: z.object({
     claude: targetSchema,
     codex: targetSchema,
-    gemini: targetSchema
+    gemini: targetSchema,
   }),
   projects: z.array(
     z.object({
@@ -33,9 +33,10 @@ const configSchema = z.object({
       path: z.string(),
       enabledAgents: z.array(z.enum(['claude', 'codex', 'gemini'])),
       allowProjectSkill: z.boolean().default(true),
-      allowProjectRule: z.boolean().default(true)
-    })
-  )
+      allowProjectRule: z.boolean().default(true),
+      ruleTemplates: z.record(z.enum(['claude', 'codex', 'gemini']), z.string()).optional(),
+    }),
+  ),
 })
 
 export function getUserConfigPath(): string {
@@ -56,7 +57,12 @@ export function deepMerge(target: any, source: any): any {
     if (source[key] === undefined) continue
     if (Array.isArray(target[key]) || Array.isArray(source[key])) {
       result[key] = source[key]
-    } else if (typeof target[key] === 'object' && target[key] !== null && typeof source[key] === 'object' && source[key] !== null) {
+    } else if (
+      typeof target[key] === 'object' &&
+      target[key] !== null &&
+      typeof source[key] === 'object' &&
+      source[key] !== null
+    ) {
       result[key] = deepMerge(target[key], source[key])
     } else {
       result[key] = source[key]
@@ -72,11 +78,10 @@ export async function loadConfig(root = process.cwd()): Promise<ResolvedConfig> 
     const raw = await readFile(defaultPath, 'utf8')
     defaultJson = JSON.parse(raw)
   } catch (error) {
-    throw new AppError(
-      'CONFIG_LOAD_FAILED',
-      `Default configuration file not found at ${defaultPath}`,
-      { defaultPath, originalError: error }
-    )
+    throw new AppError('CONFIG_LOAD_FAILED', `Default configuration file not found at ${defaultPath}`, {
+      defaultPath,
+      originalError: error,
+    })
   }
 
   const userPath = getUserConfigPath()
@@ -102,7 +107,7 @@ export async function loadConfig(root = process.cwd()): Promise<ResolvedConfig> 
       throw new AppError(
         'CONFIG_PARSE_ERROR',
         `Failed to parse user configuration at ${userPath}: ${(error as Error).message}`,
-        { userPath, originalError: error }
+        { userPath, originalError: error },
       )
     }
   }
@@ -113,14 +118,13 @@ export async function loadConfig(root = process.cwd()): Promise<ResolvedConfig> 
     const resolved = resolveConfigPaths(root, parsed)
     return {
       ...resolved,
-      workspaceRoot: root
+      workspaceRoot: root,
     }
   } catch (error) {
-    throw new AppError(
-      'CONFIG_VALIDATION_FAILED',
-      `Configuration validation failed: ${(error as Error).message}`,
-      { merged, originalError: error }
-    )
+    throw new AppError('CONFIG_VALIDATION_FAILED', `Configuration validation failed: ${(error as Error).message}`, {
+      merged,
+      originalError: error,
+    })
   }
 }
 
@@ -140,11 +144,10 @@ export async function saveConfig(userConfigUpdates: Partial<ResolvedConfig>): Pr
   try {
     await atomicWriteJson(userPath, updatedUserConfig)
   } catch (error) {
-    throw new AppError(
-      'CONFIG_SAVE_FAILED',
-      `Failed to save user configuration: ${(error as Error).message}`,
-      { userPath, originalError: error }
-    )
+    throw new AppError('CONFIG_SAVE_FAILED', `Failed to save user configuration: ${(error as Error).message}`, {
+      userPath,
+      originalError: error,
+    })
   }
 }
 
@@ -156,17 +159,17 @@ function resolveConfigPaths(root: string, config: ResolvedConfig): ResolvedConfi
     targets: {
       claude: {
         ...config.targets.claude,
-        userSkillPath: resolveTokenPath(root, config.targets.claude.userSkillPath)
+        userSkillPath: resolveTokenPath(root, config.targets.claude.userSkillPath),
       },
       codex: {
         ...config.targets.codex,
-        userSkillPath: resolveTokenPath(root, config.targets.codex.userSkillPath)
+        userSkillPath: resolveTokenPath(root, config.targets.codex.userSkillPath),
       },
       gemini: {
         ...config.targets.gemini,
-        userSkillPath: resolveTokenPath(root, config.targets.gemini.userSkillPath)
-      }
-    }
+        userSkillPath: resolveTokenPath(root, config.targets.gemini.userSkillPath),
+      },
+    },
   }
 }
 

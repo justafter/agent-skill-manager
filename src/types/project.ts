@@ -7,6 +7,7 @@ export interface Project {
   enabledAgents: AgentId[]
   allowProjectSkill: boolean
   allowProjectRule: boolean
+  ruleTemplates?: Partial<Record<AgentId, string>>
 }
 
 export interface ProjectConfig {

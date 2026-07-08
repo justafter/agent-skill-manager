@@ -24,7 +24,10 @@ const KNOWN_HTTP_STATUS: Record<string, number> = {
   CONFIG_PARSE_ERROR: 500,
   CONFIG_VALIDATION_FAILED: 500,
   CONFIG_SAVE_FAILED: 500,
-  SKILL_ALREADY_EXISTS: 409
+  CONFIG_SNAPSHOT_FAILED: 500,
+  CONFIRMATION_REQUIRED: 400,
+  SKILL_ALREADY_EXISTS: 409,
+  NOT_FOUND: 404,
 }
 
 const FALLBACK_STATUS = 500
@@ -35,7 +38,7 @@ export function errorHandler(
   res: Response,
   // express requires 4-arg signature even when next is unused
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  _next: NextFunction
+  _next: NextFunction,
 ): void {
   if (err instanceof AppError) {
     const status = KNOWN_HTTP_STATUS[err.code] ?? FALLBACK_STATUS
@@ -43,8 +46,8 @@ export function errorHandler(
       error: {
         code: err.code,
         message: err.message,
-        details: err.details
-      }
+        details: err.details,
+      },
     })
     return
   }
@@ -53,7 +56,7 @@ export function errorHandler(
   res.status(FALLBACK_STATUS).json({
     error: {
       code: 'INTERNAL_ERROR',
-      message: 'Internal server error'
-    }
+      message: 'Internal server error',
+    },
   })
 }

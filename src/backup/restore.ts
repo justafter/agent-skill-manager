@@ -11,7 +11,7 @@ export async function restoreBackup(backupId: string, root = process.cwd()): Pro
   const config = await loadConfig(root)
   const backupDir = path.resolve(root, config.backupDir)
   const indexFile = path.join(backupDir, backupId, 'index.json')
-  
+
   if (!(await pathExists(indexFile))) {
     throw new AppError('BACKUP_NOT_FOUND', `Backup index file not found for ID: ${backupId}`)
   }

@@ -23,7 +23,7 @@ export function registerDoctorCommand(program: Command): void {
             enabled: target.enabled,
             userSkillPath: await pathDetails(target.userSkillPath),
             projectSkillPath: target.projectSkillPath,
-            projectRuleFile: target.projectRuleFile
+            projectRuleFile: target.projectRuleFile,
           }
         }
 
@@ -35,7 +35,7 @@ export function registerDoctorCommand(program: Command): void {
             path: await pathDetails(project.path),
             enabledAgents: project.enabledAgents,
             allowProjectSkill: project.allowProjectSkill,
-            allowProjectRule: project.allowProjectRule
+            allowProjectRule: project.allowProjectRule,
           })
         }
 
@@ -45,10 +45,10 @@ export function registerDoctorCommand(program: Command): void {
             backupDir: await pathDetails(config.backupDir),
             devDir: await pathDetails(config.devDir),
             ruleTemplateDir: await pathDetails(config.ruleTemplateDir),
-            server: config.server
+            server: config.server,
           },
           targets: targetsInfo,
-          projects: projectsInfo
+          projects: projectsInfo,
         }
 
         console.log(JSON.stringify(diagnostics, null, 2))

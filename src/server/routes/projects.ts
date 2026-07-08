@@ -9,6 +9,7 @@ import type { AgentId } from '../../types/adapter.js'
 import { AppError } from '../../utils/errors.js'
 import { planRuleSync } from '../../rules/plan.js'
 import { applyRuleSync, crossSyncRule } from '../../rules/apply.js'
+import { buildRemovePreview, removeProject } from '../../projects/remove.js'
 
 function resolveRuleTemplateDir(config: { ruleTemplateDir: string; workspaceRoot?: string }): string {
   const raw = config.ruleTemplateDir
@@ -16,7 +17,7 @@ function resolveRuleTemplateDir(config: { ruleTemplateDir: string; workspaceRoot
     throw new AppError(
       'CONFIG_MISSING',
       'ruleTemplateDir is not configured. Set it via UI / POST /api/config/rule-template-dir ' +
-        'or in ~/.skill-manager/config.json before using Rule operations.'
+        'or in ~/.skill-manager/config.json before using Rule operations.',
     )
   }
   return path.isAbsolute(raw) ? raw : path.resolve(config.workspaceRoot || process.cwd(), raw)
@@ -36,13 +37,13 @@ export function projectsRouter(): Router {
           const scan = await scanProject(p)
           projectsWithScan.push({
             ...p,
-            scan
+            scan,
           })
         } catch {
           // If scan fails (e.g. project folder deleted), return empty scan
           projectsWithScan.push({
             ...p,
-            scan: { projectId: p.id, skillDirs: [], ruleFiles: [] }
+            scan: { projectId: p.id, skillDirs: [], ruleFiles: [] },
           })
         }
       }
@@ -83,7 +84,7 @@ export function projectsRouter(): Router {
       const agentsToCheck: { agent: AgentId; folder: string }[] = [
         { agent: 'claude', folder: '.claude' },
         { agent: 'codex', folder: '.agents' },
-        { agent: 'gemini', folder: '.agents' }
+        { agent: 'gemini', folder: '.agents' },
       ]
       const detectedAgentsSet = new Set<AgentId>()
       for (const check of agentsToCheck) {
@@ -95,9 +96,10 @@ export function projectsRouter(): Router {
       }
 
       // Fallback
-      const enabledAgents = detectedAgents.length > 0
-        ? detectedAgents
-        : (Object.keys(config.targets) as AgentId[]).filter((a) => config.targets[a]?.enabled)
+      const enabledAgents =
+        detectedAgents.length > 0
+          ? detectedAgents
+          : (Object.keys(config.targets) as AgentId[]).filter((a) => config.targets[a]?.enabled)
 
       const newProject = {
         id,
@@ -105,7 +107,7 @@ export function projectsRouter(): Router {
         path: absPath,
         enabledAgents,
         allowProjectSkill: true,
-        allowProjectRule: true
+        allowProjectRule: true,
       }
 
       const updatedProjects = [...config.projects, newProject]
@@ -157,7 +159,7 @@ export function projectsRouter(): Router {
       }
 
       const applyResult = await applyProjectSkillInject(planId, id, {
-        allowManagedModify
+        allowManagedModify,
       })
 
       res.json(applyResult)
@@ -222,6 +224,79 @@ export function projectsRouter(): Router {
 
       await crossSyncRule(id, sourceAgent as AgentId, targetAgent as AgentId, mode)
       res.json({ success: true })
+    } catch (error) {
+      next(error)
+    }
+  })
+
+  // 8. PUT /api/projects/:id/rules/template - Bind project to a specific rule template
+  router.put('/:id/rules/template', async (req, res, next) => {
+    try {
+      const { id } = req.params
+      const { agent, templateName } = req.body
+
+      if (!agent || templateName === undefined) {
+        throw new AppError('VALIDATION_ERROR', 'agent and templateName are required.')
+      }
+
+      const config = await loadConfig()
+      const projects = config.projects || []
+      const projectIdx = projects.findIndex((p) => p.id === id)
+      if (projectIdx === -1) {
+        throw new AppError('NOT_FOUND', `Project not found: ${id}`)
+      }
+
+      const project = projects[projectIdx]
+      const ruleTemplates = { ...(project.ruleTemplates || {}) }
+
+      if (templateName === null || templateName === '') {
+        delete ruleTemplates[agent as AgentId]
+      } else {
+        ruleTemplates[agent as AgentId] = templateName
+      }
+
+      const updatedProject = {
+        ...project,
+        ruleTemplates,
+      }
+
+      const updatedProjects = [...projects]
+      updatedProjects[projectIdx] = updatedProject
+
+      await saveConfig({ projects: updatedProjects })
+      res.json({ success: true, project: updatedProject })
+    } catch (error) {
+      next(error)
+    }
+  })
+
+  // 9. GET /api/projects/:id/remove-preview - Build removal impact preview (read-only).
+  router.get('/:id/remove-preview', async (req, res, next) => {
+    try {
+      const { id } = req.params
+      const config = await loadConfig()
+      const target = (config.projects ?? []).find((p) => p.id === id)
+      if (!target) {
+        throw new AppError('NOT_FOUND', `Project not found: ${id}`)
+      }
+      const preview = await buildRemovePreview(target)
+      res.json(preview)
+    } catch (error) {
+      next(error)
+    }
+  })
+
+  // 10. DELETE /api/projects/:id - Remove project from config (no files deleted).
+  router.delete('/:id', async (req, res, next) => {
+    try {
+      const { id } = req.params
+      const confirmed = req.body?.confirmed === true
+      const result = await removeProject(id, confirmed)
+      res.json({
+        success: true,
+        projects: result.projects,
+        backupPath: result.backupPath,
+      })
     } catch (error) {
       next(error)
     }

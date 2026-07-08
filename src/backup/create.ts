@@ -14,7 +14,7 @@ export async function createBackupIndex(root: string, reason: string, items: Bac
     backupId,
     createdAt: new Date().toISOString(),
     reason,
-    items
+    items,
   }
 
   const dir = path.join(root, backupId)
@@ -27,7 +27,7 @@ export async function backupSkillAndRegistry(
   root: string,
   backupDir: string,
   skillName: string,
-  reason: string
+  reason: string,
 ): Promise<BackupIndex> {
   const backupId = `bk_${Date.now()}_${randomUUID().slice(0, 8)}`
   const destDir = path.join(backupDir, backupId)
@@ -43,7 +43,7 @@ export async function backupSkillAndRegistry(
     items.push({
       type: 'registry',
       originalPath: registryPath,
-      backupPath: backupRegistryPath
+      backupPath: backupRegistryPath,
     })
   }
 
@@ -56,7 +56,7 @@ export async function backupSkillAndRegistry(
       type: 'skill',
       skillName,
       originalPath: oldSkillDir,
-      backupPath: backupSkillDir
+      backupPath: backupSkillDir,
     })
   }
 
@@ -64,7 +64,7 @@ export async function backupSkillAndRegistry(
     backupId,
     createdAt: new Date().toISOString(),
     reason,
-    items
+    items,
   }
 
   await atomicWriteJson(path.join(destDir, 'index.json'), index)
@@ -75,7 +75,7 @@ export async function backupDevelopmentSkill(
   backupDir: string,
   skillName: string,
   developmentPath: string,
-  reason: string
+  reason: string,
 ): Promise<BackupIndex> {
   const backupId = `bk_${Date.now()}_${randomUUID().slice(0, 8)}`
   const destDir = path.join(backupDir, backupId)
@@ -94,7 +94,7 @@ export async function backupDevelopmentSkill(
       backupPath: backupSkillDir,
       targetType: 'development',
       targetAgent: 'development',
-      targetSkillPath: developmentPath
+      targetSkillPath: developmentPath,
     })
   }
 
@@ -102,18 +102,17 @@ export async function backupDevelopmentSkill(
     backupId,
     createdAt: new Date().toISOString(),
     reason,
-    items
+    items,
   }
 
   await atomicWriteJson(path.join(destDir, 'index.json'), index)
   return index
 }
 
-
 export async function createManualBackup(
   root = process.cwd(),
   skillName?: string,
-  reason = 'Manual backup'
+  reason = 'Manual backup',
 ): Promise<BackupIndex> {
   const config = await loadConfig(root)
   const timestamp = Date.now()
@@ -133,7 +132,7 @@ export async function createManualBackup(
     items.push({
       type: 'registry',
       originalPath: registryPath,
-      backupPath: backupRegistryPath
+      backupPath: backupRegistryPath,
     })
   }
 
@@ -147,7 +146,7 @@ export async function createManualBackup(
         type: 'skill',
         skillName,
         originalPath: skillDir,
-        backupPath: backupSkillDir
+        backupPath: backupSkillDir,
       })
     } else {
       throw new AppError('SKILL_NOT_FOUND', `Skill "${skillName}" not found in local library.`)
@@ -161,7 +160,7 @@ export async function createManualBackup(
       items.push({
         type: 'skill',
         originalPath: skillsDir,
-        backupPath: backupSkillsDir
+        backupPath: backupSkillsDir,
       })
     }
   }
@@ -170,7 +169,7 @@ export async function createManualBackup(
     backupId,
     createdAt: new Date().toISOString(),
     reason,
-    items
+    items,
   }
 
   await atomicWriteJson(path.join(destDir, 'index.json'), index)

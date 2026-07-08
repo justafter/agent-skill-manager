@@ -24,7 +24,7 @@ export interface ImportResult {
 export async function importSkill(
   skillPath: string,
   options: ImportOptions = {},
-  root = process.cwd()
+  root = process.cwd(),
 ): Promise<ImportResult> {
   // 1. Resolve and parse skill directory metadata
   const resolvedPath = path.resolve(skillPath)
@@ -46,14 +46,14 @@ export async function importSkill(
     if (existing.checksum === meta.checksum) {
       return {
         status: 'skipped',
-        skill: existing
+        skill: existing,
       }
     }
 
     if (options.skip) {
       return {
         status: 'skipped',
-        skill: existing
+        skill: existing,
       }
     }
 
@@ -61,7 +61,7 @@ export async function importSkill(
       throw new AppError(
         'SKILL_ALREADY_EXISTS',
         `Skill "${meta.name}" already exists with a different checksum. Use --force to overwrite.`,
-        { name: meta.name, existingChecksum: existing.checksum, newChecksum: meta.checksum }
+        { name: meta.name, existingChecksum: existing.checksum, newChecksum: meta.checksum },
       )
     }
 
@@ -70,7 +70,7 @@ export async function importSkill(
       root,
       config.backupDir,
       meta.name,
-      `Force override skill "${meta.name}"`
+      `Force override skill "${meta.name}"`,
     )
     backupId = backupIndex.backupId
   }
@@ -98,7 +98,7 @@ export async function importSkill(
     ...canonicalMeta,
     localPath: resolvedPath, // original source developer directory
     syncedTargets: existing ? existing.syncedTargets : [],
-    projectInstalls: existing ? existing.projectInstalls : []
+    projectInstalls: existing ? existing.projectInstalls : [],
   }
 
   registry.skills[meta.name] = updatedSkill
@@ -107,6 +107,6 @@ export async function importSkill(
   return {
     status: existing ? 'updated' : 'imported',
     skill: updatedSkill,
-    backupId
+    backupId,
   }
 }

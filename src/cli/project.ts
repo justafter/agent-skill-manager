@@ -4,10 +4,13 @@ import { loadConfig, saveConfig } from '../core/config.js'
 import { loadRegistry } from '../core/registry.js'
 import { planProjectSkillInject, applyProjectSkillInject } from '../projects/inject.js'
 import { scanProject } from '../projects/scanner.js'
+import { buildRemovePreview, removeProject } from '../projects/remove.js'
 import { pathExists } from '../utils/fs.js'
 import type { AgentId } from '../types/adapter.js'
 import { planRuleSync } from '../rules/plan.js'
 import { applyRuleSync } from '../rules/apply.js'
+import { createInterface } from 'node:readline/promises'
+import { stdin as input, stdout as output } from 'node:process'
 
 export function registerProjectCommand(program: Command): void {
   const project = program.command('project').description('Manage project workspaces')
@@ -74,7 +77,7 @@ export function registerProjectCommand(program: Command): void {
         const agentsToCheck: { agent: AgentId; folder: string }[] = [
           { agent: 'claude', folder: '.claude' },
           { agent: 'codex', folder: '.agents' },
-          { agent: 'gemini', folder: '.agents' }
+          { agent: 'gemini', folder: '.agents' },
         ]
         const detectedAgentsSet = new Set<AgentId>()
         for (const check of agentsToCheck) {
@@ -86,9 +89,10 @@ export function registerProjectCommand(program: Command): void {
         }
 
         // Fallback to config targets if none detected
-        const enabledAgents = detectedAgents.length > 0
-          ? detectedAgents
-          : (Object.keys(config.targets) as AgentId[]).filter((a) => config.targets[a]?.enabled)
+        const enabledAgents =
+          detectedAgents.length > 0
+            ? detectedAgents
+            : (Object.keys(config.targets) as AgentId[]).filter((a) => config.targets[a]?.enabled)
 
         const newProject = {
           id,
@@ -96,7 +100,7 @@ export function registerProjectCommand(program: Command): void {
           path: absPath,
           enabledAgents,
           allowProjectSkill: true,
-          allowProjectRule: true
+          allowProjectRule: true,
         }
 
         const updatedProjects = [...config.projects, newProject]
@@ -149,75 +153,83 @@ export function registerProjectCommand(program: Command): void {
     .option('--dry-run', 'Generate and show plan without executing', false)
     .option('--allow-managed-modify', 'Allow overwriting managed skill files in project that have changed')
     .description('Inject/sync a skill to project workspace')
-    .action(async (projectId: string, skillName: string, options: { agent: string; dryRun: boolean; allowManagedModify?: boolean }) => {
-      try {
-        const config = await loadConfig()
-        const p = config.projects.find((proj) => proj.id === projectId)
-        if (!p) {
-          console.error(`Error: Project not found: ${projectId}`)
+    .action(
+      async (
+        projectId: string,
+        skillName: string,
+        options: { agent: string; dryRun: boolean; allowManagedModify?: boolean },
+      ) => {
+        try {
+          const config = await loadConfig()
+          const p = config.projects.find((proj) => proj.id === projectId)
+          if (!p) {
+            console.error(`Error: Project not found: ${projectId}`)
+            process.exit(1)
+          }
+
+          const registry = await loadRegistry()
+          const skill = registry.skills[skillName]
+          if (!skill) {
+            console.error(`Error: Skill not found in local library: ${skillName}`)
+            process.exit(1)
+          }
+
+          const agent = options.agent as AgentId
+          if (!['claude', 'codex', 'gemini'].includes(agent)) {
+            console.error(`Error: Invalid agent: ${agent}. Supported: claude, codex, gemini`)
+            process.exit(1)
+          }
+
+          const planResult = await planProjectSkillInject(p, skill, agent)
+
+          console.log(`\n=== Project Inject Plan [${planResult.plan.planId}] ===`)
+          console.log(`Project:  ${p.name} (${p.id})`)
+          console.log(`Skill:    ${skillName}`)
+          console.log(`Agent:    ${agent}`)
+          console.log(`Summary:`)
+          console.log(`  - Create:   ${planResult.summary.create}`)
+          console.log(`  - Modify:   ${planResult.summary.modify}`)
+          console.log(`  - Skip:     ${planResult.summary.skip}`)
+          console.log(`  - Conflict: ${planResult.summary.conflict}`)
+          console.log(``)
+
+          for (const item of planResult.plan.items) {
+            console.log(`  [${item.kind.toUpperCase()}] -> ${item.target}`)
+          }
+          console.log(``)
+
+          if (options.dryRun) {
+            console.log(`Dry-run mode. Inject plan was NOT applied.`)
+            return
+          }
+
+          if (planResult.summary.create === 0 && planResult.summary.modify === 0) {
+            console.log(`No changes to apply.`)
+            return
+          }
+
+          if (planResult.summary.conflict > 0 && !options.allowManagedModify) {
+            console.error(
+              `Error: Conflict detected. Please resolve conflict or specify --allow-managed-modify to overwrite.`,
+            )
+            process.exit(1)
+          }
+
+          const applyResult = await applyProjectSkillInject(planResult.plan.planId, projectId, {
+            allowManagedModify: options.allowManagedModify,
+          })
+
+          console.log(`[+] Skill injected successfully.`)
+          console.log(`    Applied: ${applyResult.applied.length} items`)
+          if (applyResult.skipped.length > 0) {
+            console.log(`    Skipped: ${applyResult.skipped.length} items`)
+          }
+        } catch (error) {
+          console.error('Project injection failed:', (error as Error).message)
           process.exit(1)
         }
-
-        const registry = await loadRegistry()
-        const skill = registry.skills[skillName]
-        if (!skill) {
-          console.error(`Error: Skill not found in local library: ${skillName}`)
-          process.exit(1)
-        }
-
-        const agent = options.agent as AgentId
-        if (!['claude', 'codex', 'gemini'].includes(agent)) {
-          console.error(`Error: Invalid agent: ${agent}. Supported: claude, codex, gemini`)
-          process.exit(1)
-        }
-
-        const planResult = await planProjectSkillInject(p, skill, agent)
-
-        console.log(`\n=== Project Inject Plan [${planResult.plan.planId}] ===`)
-        console.log(`Project:  ${p.name} (${p.id})`)
-        console.log(`Skill:    ${skillName}`)
-        console.log(`Agent:    ${agent}`)
-        console.log(`Summary:`)
-        console.log(`  - Create:   ${planResult.summary.create}`)
-        console.log(`  - Modify:   ${planResult.summary.modify}`)
-        console.log(`  - Skip:     ${planResult.summary.skip}`)
-        console.log(`  - Conflict: ${planResult.summary.conflict}`)
-        console.log(``)
-
-        for (const item of planResult.plan.items) {
-          console.log(`  [${item.kind.toUpperCase()}] -> ${item.target}`)
-        }
-        console.log(``)
-
-        if (options.dryRun) {
-          console.log(`Dry-run mode. Inject plan was NOT applied.`)
-          return
-        }
-
-        if (planResult.summary.create === 0 && planResult.summary.modify === 0) {
-          console.log(`No changes to apply.`)
-          return
-        }
-
-        if (planResult.summary.conflict > 0 && !options.allowManagedModify) {
-          console.error(`Error: Conflict detected. Please resolve conflict or specify --allow-managed-modify to overwrite.`)
-          process.exit(1)
-        }
-
-        const applyResult = await applyProjectSkillInject(planResult.plan.planId, projectId, {
-          allowManagedModify: options.allowManagedModify
-        })
-
-        console.log(`[+] Skill injected successfully.`)
-        console.log(`    Applied: ${applyResult.applied.length} items`)
-        if (applyResult.skipped.length > 0) {
-          console.log(`    Skipped: ${applyResult.skipped.length} items`)
-        }
-      } catch (error) {
-        console.error('Project injection failed:', (error as Error).message)
-        process.exit(1)
-      }
-    })
+      },
+    )
 
   // 5. asm project plan-rules <project-id> --agent <agent>
   project
@@ -283,7 +295,9 @@ export function registerProjectCommand(program: Command): void {
         // Generate plan to check for conflict
         const plan = await planRuleSync(p, agent)
         if (plan.status === 'conflict' && mode === 'block') {
-          console.error(`Error: Target file exists but has no managed block. Please specify --mode overwrite to overwrite it.`)
+          console.error(
+            `Error: Target file exists but has no managed block. Please specify --mode overwrite to overwrite it.`,
+          )
           process.exit(1)
         }
 
@@ -320,6 +334,76 @@ export function registerProjectCommand(program: Command): void {
         console.log(`[+] Rules pulled successfully from ${p.name} to local ${agent} template.`)
       } catch (error) {
         console.error('Pull rules failed:', (error as Error).message)
+        process.exit(1)
+      }
+    })
+
+  // 8. asm project remove <project-id> [--yes]
+  project
+    .command('remove')
+    .argument('<project-id>', 'Project ID')
+    .option('--yes', 'Skip interactive confirmation (preview is always printed)', false)
+    .description('Unregister a project (de-register only; no files are deleted)')
+    .action(async (projectId: string, options: { yes: boolean }) => {
+      try {
+        const config = await loadConfig()
+        const target = (config.projects ?? []).find((proj) => proj.id === projectId)
+        if (!target) {
+          console.error(`Error: Project not found: ${projectId}`)
+          process.exit(1)
+        }
+
+        const preview = await buildRemovePreview(target)
+
+        // Preview (always printed).
+        console.log(`\n=== 项目移除影响预览 [${preview.project.name}] (${preview.project.id}) ===\n`)
+        console.log(`待移除注册记录:`)
+        console.log(`  ID:   ${preview.project.id}`)
+        console.log(`  Name: ${preview.project.name}`)
+        console.log(`  Path: ${preview.project.path}`)
+
+        console.log(`\n项目级 Skill 安装（不会被删除，仅解除管理）:`)
+        if (preview.skillInstalls.length === 0) {
+          console.log(`  (无)`)
+        } else {
+          for (const s of preview.skillInstalls) {
+            console.log(`  [${s.agent}] ${s.skill.padEnd(28)} ${s.absolutePath}  ${s.exists ? '存在' : '缺失'}`)
+          }
+        }
+
+        console.log(`\n项目级规则文件（不会被删除，仅解除管理）:`)
+        if (preview.ruleFiles.length === 0) {
+          console.log(`  (无)`)
+        } else {
+          for (const r of preview.ruleFiles) {
+            console.log(`  [${r.agent}] ${r.file.padEnd(12)} ${r.absolutePath}  ${r.exists ? '存在' : '缺失'}`)
+          }
+        }
+
+        console.log(``)
+        console.log(`⚠ 以下文件不会被删除，移除后仅不再受本工具管理。`)
+        console.log(`⚠ 移除前将自动备份当前 config.json 到 backups/config-snapshots/。`)
+
+        if (!options.yes) {
+          const rl = createInterface({ input, output })
+          try {
+            const answer = (await rl.question(`\n确认移除? [y/N]: `)).trim().toLowerCase()
+            if (answer !== 'y' && answer !== 'yes') {
+              console.log('已取消。')
+              return
+            }
+          } finally {
+            rl.close()
+          }
+        } else {
+          console.log(`\n(--yes 已指定，跳过交互式确认)`)
+        }
+
+        const result = await removeProject(projectId, true)
+        console.log(`[+] 已解除注册 ${projectId}。`)
+        console.log(`    备份已保存至: ${result.backupPath}`)
+      } catch (error) {
+        console.error('Project removal failed:', (error as Error).message)
         process.exit(1)
       }
     })

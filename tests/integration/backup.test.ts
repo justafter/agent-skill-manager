@@ -30,14 +30,11 @@ describe('D4 Backup & Restore', () => {
       targets: {
         claude: { enabled: false, userSkillPath: '', projectSkillPath: '', projectRuleFile: '' },
         codex: { enabled: false, userSkillPath: '', projectSkillPath: '', projectRuleFile: '' },
-        gemini: { enabled: false, userSkillPath: '', projectSkillPath: '', projectRuleFile: '' }
+        gemini: { enabled: false, userSkillPath: '', projectSkillPath: '', projectRuleFile: '' },
       },
-      projects: []
+      projects: [],
     }
-    await writeFile(
-      path.join(tempWorkspace, 'skill-manager.config.json'),
-      JSON.stringify(defaultConfig, null, 2)
-    )
+    await writeFile(path.join(tempWorkspace, 'skill-manager.config.json'), JSON.stringify(defaultConfig, null, 2))
 
     await mkdir(path.join(tempWorkspace, 'library', 'skills'), { recursive: true })
   })
@@ -58,8 +55,14 @@ describe('D4 Backup & Restore', () => {
     await mkdir(skillDir1, { recursive: true })
     await mkdir(skillDir2, { recursive: true })
 
-    await writeFile(path.join(skillDir1, 'SKILL.md'), '---\nname: skill-one\nversion: 1.0.0\ndescription: one\n---\nCode One')
-    await writeFile(path.join(skillDir2, 'SKILL.md'), '---\nname: skill-two\nversion: 1.0.0\ndescription: two\n---\nCode Two')
+    await writeFile(
+      path.join(skillDir1, 'SKILL.md'),
+      '---\nname: skill-one\nversion: 1.0.0\ndescription: one\n---\nCode One',
+    )
+    await writeFile(
+      path.join(skillDir2, 'SKILL.md'),
+      '---\nname: skill-two\nversion: 1.0.0\ndescription: two\n---\nCode Two',
+    )
 
     const registry = await loadRegistry(tempWorkspace)
     registry.skills[skillName1] = {
@@ -69,7 +72,7 @@ describe('D4 Backup & Restore', () => {
       checksum: 'sha256:one' as any,
       localPath: skillDir1,
       syncedTargets: [],
-      projectInstalls: []
+      projectInstalls: [],
     }
     registry.skills[skillName2] = {
       name: skillName2,
@@ -78,7 +81,7 @@ describe('D4 Backup & Restore', () => {
       checksum: 'sha256:two' as any,
       localPath: skillDir2,
       syncedTargets: [],
-      projectInstalls: []
+      projectInstalls: [],
     }
     await saveRegistry(registry, tempWorkspace)
 
@@ -129,7 +132,7 @@ describe('D4 Backup & Restore', () => {
   it('fails to restore non-existent backup ID', async () => {
     await assert.rejects(
       restoreBackup('bk_non_existent_id', tempWorkspace),
-      (err: any) => err instanceof AppError && err.code === 'BACKUP_NOT_FOUND'
+      (err: any) => err instanceof AppError && err.code === 'BACKUP_NOT_FOUND',
     )
   })
 })

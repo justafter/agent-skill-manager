@@ -19,7 +19,12 @@ export function syncRouter(): Router {
         throw new AppError('VALIDATION_ERROR', 'Missing skillName parameter')
       }
 
-      const result = await planSync(skillName, targets, { allowManagedModify, allowConflictOverwrite, from }, process.cwd())
+      const result = await planSync(
+        skillName,
+        targets,
+        { allowManagedModify, allowConflictOverwrite, from },
+        process.cwd(),
+      )
       res.json(result)
     } catch (error) {
       next(error)

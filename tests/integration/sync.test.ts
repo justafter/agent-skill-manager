@@ -40,27 +40,24 @@ describe('D3a Local Library Push Sync', () => {
           enabled: true,
           userSkillPath: claudeSkillsDir,
           projectSkillPath: '',
-          projectRuleFile: ''
+          projectRuleFile: '',
         },
         codex: {
           enabled: true,
           userSkillPath: codexSkillsDir,
           projectSkillPath: '',
-          projectRuleFile: ''
+          projectRuleFile: '',
         },
         gemini: {
           enabled: true,
           userSkillPath: path.join(tempWorkspace, 'gemini-skills'),
           projectSkillPath: '',
-          projectRuleFile: ''
-        }
+          projectRuleFile: '',
+        },
       },
-      projects: []
+      projects: [],
     }
-    await writeFile(
-      path.join(tempWorkspace, 'skill-manager.config.json'),
-      JSON.stringify(defaultConfig, null, 2)
-    )
+    await writeFile(path.join(tempWorkspace, 'skill-manager.config.json'), JSON.stringify(defaultConfig, null, 2))
 
     await mkdir(path.join(tempWorkspace, 'library', 'skills'), { recursive: true })
   })
@@ -85,22 +82,25 @@ describe('D3a Local Library Push Sync', () => {
       checksum: 'sha256:dummy' as any,
       localPath: sourceDir,
       syncedTargets: [],
-      projectInstalls: []
+      projectInstalls: [],
     }
     await saveRegistry(registry, tempWorkspace)
 
     await assert.rejects(
       planSync(skillName, ['gemini:user'], {}, tempWorkspace),
-      (err: any) => err instanceof AppError && err.code === 'TARGET_REFUSED'
+      (err: any) => err instanceof AppError && err.code === 'TARGET_REFUSED',
     )
   })
 
   it('performs dry-run with no physical changes', async () => {
     const skillName = 'test-skill'
     const sourceDir = path.join(tempWorkspace, 'library', 'skills', skillName)
-    
+
     // Write new content to canonical source
-    await writeFile(path.join(sourceDir, 'SKILL.md'), '---\nname: test-skill\nversion: 1.0.0\ndescription: test\n---\nHello')
+    await writeFile(
+      path.join(sourceDir, 'SKILL.md'),
+      '---\nname: test-skill\nversion: 1.0.0\ndescription: test\n---\nHello',
+    )
 
     // Recalculate checksum
     const { checksumDirectory } = await import('../../src/utils/hash.js')
@@ -121,7 +121,7 @@ describe('D3a Local Library Push Sync', () => {
   it('applies plan successfully for create item', async () => {
     const skillName = 'test-skill'
     const planResult = await planSync(skillName, ['claude:user'], {}, tempWorkspace)
-    
+
     const applyResult = await applySyncPlan(planResult.plan.planId, {}, tempWorkspace)
     assert.equal(applyResult.applied.length, 1)
     assert.equal(applyResult.applied[0].kind, 'create')
@@ -162,10 +162,13 @@ describe('D3a Local Library Push Sync', () => {
   it('identifies conflict and refuses overwrite when target is unmanaged', async () => {
     const skillName = 'test-skill'
     const targetDir = path.join(codexSkillsDir, skillName)
-    
+
     // Create unmanaged target skill
     await mkdir(targetDir, { recursive: true })
-    await writeFile(path.join(targetDir, 'SKILL.md'), '---\nname: test-skill\nversion: 1.0.0\ndescription: unmanaged\n---\n')
+    await writeFile(
+      path.join(targetDir, 'SKILL.md'),
+      '---\nname: test-skill\nversion: 1.0.0\ndescription: unmanaged\n---\n',
+    )
 
     const planResult = await planSync(skillName, ['codex:user'], {}, tempWorkspace)
     assert.equal(planResult.plan.items.length, 1)
@@ -184,20 +187,11 @@ describe('D3a Local Library Push Sync', () => {
     const skillName = 'test-skill'
     const targetDir = path.join(codexSkillsDir, skillName)
 
-    const planResult = await planSync(
-      skillName,
-      ['codex:user'],
-      { allowConflictOverwrite: true },
-      tempWorkspace
-    )
+    const planResult = await planSync(skillName, ['codex:user'], { allowConflictOverwrite: true }, tempWorkspace)
     assert.equal(planResult.plan.items.length, 1)
     assert.equal(planResult.plan.items[0].kind, 'modify')
 
-    const applyResult = await applySyncPlan(
-      planResult.plan.planId,
-      { allowConflictOverwrite: true },
-      tempWorkspace
-    )
+    const applyResult = await applySyncPlan(planResult.plan.planId, { allowConflictOverwrite: true }, tempWorkspace)
     assert.equal(applyResult.applied.length, 1)
     assert.equal(applyResult.applied[0].kind, 'modify')
 
@@ -216,7 +210,10 @@ describe('D3a Local Library Push Sync', () => {
     const targetDir = path.join(claudeSkillsDir, skillName)
 
     // Modify target file content to cause checksum mismatch
-    await writeFile(path.join(targetDir, 'SKILL.md'), '---\nname: test-skill\nversion: 1.0.0\ndescription: test\n---\nModified manually!')
+    await writeFile(
+      path.join(targetDir, 'SKILL.md'),
+      '---\nname: test-skill\nversion: 1.0.0\ndescription: test\n---\nModified manually!',
+    )
 
     // Plan should identify as conflict because allowManagedModify is false by default
     const planResult = await planSync(skillName, ['claude:user'], {}, tempWorkspace)
@@ -245,7 +242,7 @@ describe('D3a Local Library Push Sync', () => {
     // Let's find the backup folder
     const backupEntries = await readdir(backupsDir)
     let foundClaudeBackup = false
-    for (const entry of backupEntries.filter(e => e.startsWith('bk_'))) {
+    for (const entry of backupEntries.filter((e) => e.startsWith('bk_'))) {
       const backupIndexFile = path.join(backupsDir, entry, 'index.json')
       if (!(await pathExists(backupIndexFile))) continue
       const backupIndex = JSON.parse(await readFile(backupIndexFile, 'utf8'))
@@ -269,7 +266,7 @@ describe('D3a Local Library Push Sync', () => {
     // But we will lock Codex dir or trigger a safety violation to cause apply failure
     await rm(path.join(codexSkillsDir, skillName), { recursive: true, force: true })
     const planResult = await planSync(skillName, ['codex:user'], {}, tempWorkspace)
-    
+
     // Corrupt config or targetDir to cause path guard failure
     const badPlanItem = planResult.plan.items[0]
     badPlanItem.target = 'C:\\forbidden\\path'
@@ -280,7 +277,7 @@ describe('D3a Local Library Push Sync', () => {
 
     await assert.rejects(
       applySyncPlan(planResult.plan.planId, {}, tempWorkspace),
-      (err: any) => err instanceof AppError && err.code === 'PATH_OUT_OF_BOUNDS'
+      (err: any) => err instanceof AppError && err.code === 'PATH_OUT_OF_BOUNDS',
     )
 
     // Verify registry syncedTargets did NOT change

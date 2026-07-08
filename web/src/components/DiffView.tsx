@@ -5,8 +5,8 @@ export interface DiffViewProps {
 export function DiffView({ diff }: DiffViewProps) {
   if (!diff || diff.trim() === '') {
     return (
-      <div 
-        className="empty-state" 
+      <div
+        className="empty-state"
         style={{ padding: '20px', background: '#f8fafc', color: '#64748b', borderRadius: '8px' }}
       >
         没有变更差异。
@@ -17,17 +17,19 @@ export function DiffView({ diff }: DiffViewProps) {
   const lines = diff.split('\n')
 
   return (
-    <pre style={{
-      background: '#0f172a',
-      color: '#e2e8f0',
-      padding: '16px',
-      borderRadius: '8px',
-      overflowX: 'auto',
-      fontFamily: 'Consolas, Monaco, monospace',
-      fontSize: '12px',
-      lineHeight: '1.6',
-      margin: 0
-    }}>
+    <pre
+      style={{
+        background: '#0f172a',
+        color: '#e2e8f0',
+        padding: '16px',
+        borderRadius: '8px',
+        overflowX: 'auto',
+        fontFamily: 'Consolas, Monaco, monospace',
+        fontSize: '12px',
+        lineHeight: '1.6',
+        margin: 0,
+      }}
+    >
       {lines.map((line, idx) => {
         let style: React.CSSProperties = {}
         if (line.startsWith('+') && !line.startsWith('+++')) {

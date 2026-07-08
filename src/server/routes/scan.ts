@@ -4,6 +4,7 @@ import { loadRegistry } from '../../core/registry.js'
 import { createAdapters } from '../../adapters/registry.js'
 import { identifySkillState } from '../../adapters/scan.js'
 import { scanDevelopmentSkills } from '../../core/development-scan.js'
+import { resolveCanonicalSkillStates } from '../../core/canonical-skill.js'
 import { pathExists } from '../../utils/fs.js'
 import type { TargetKey, AgentId } from '../../types/adapter.js'
 
@@ -15,10 +16,10 @@ export function scanRouter(): Router {
       const registry = await loadRegistry()
       const adapters = createAdapters(config)
       const skills = Object.values(registry.skills)
+      const canonicalSkills = await resolveCanonicalSkillStates(skills)
+      const canonicalSkillMap = new Map(canonicalSkills.map((skill) => [skill.name, skill]))
 
-      const enabledAgents = (Object.keys(adapters) as AgentId[]).filter(
-        (agent) => config.targets[agent]?.enabled
-      )
+      const enabledAgents = (Object.keys(adapters) as AgentId[]).filter((agent) => config.targets[agent]?.enabled)
 
       const results: Record<TargetKey, Record<string, string>> = {} as any
       const untracked: Record<TargetKey, string[]> = {} as any
@@ -35,15 +36,13 @@ export function scanRouter(): Router {
 
         if (detected) {
           const targetSkills = await adapter.scanUserSkills()
-          
+
           for (const skill of skills) {
             const targetSkillInfo = targetSkills[skill.name]
-            results[targetKey][skill.name] = identifySkillState(skill, targetSkillInfo)
+            results[targetKey][skill.name] = identifySkillState(canonicalSkillMap.get(skill.name), targetSkillInfo)
           }
 
-          untracked[targetKey] = Object.keys(targetSkills).filter(
-            (name) => !registry.skills[name]
-          )
+          untracked[targetKey] = Object.keys(targetSkills).filter((name) => !registry.skills[name])
         } else {
           for (const skill of skills) {
             results[targetKey][skill.name] = 'missing'

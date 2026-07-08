@@ -35,27 +35,24 @@ describe('D1 Skill Import & Registry', () => {
           enabled: true,
           userSkillPath: path.join(tempWorkspace, 'claude-skills'),
           projectSkillPath: '.claude/skills',
-          projectRuleFile: 'CLAUDE.md'
+          projectRuleFile: 'CLAUDE.md',
         },
         codex: {
           enabled: false,
           userSkillPath: '',
           projectSkillPath: '',
-          projectRuleFile: ''
+          projectRuleFile: '',
         },
         gemini: {
           enabled: false,
           userSkillPath: '',
           projectSkillPath: '',
-          projectRuleFile: ''
-        }
+          projectRuleFile: '',
+        },
       },
-      projects: []
+      projects: [],
     }
-    await writeFile(
-      path.join(tempWorkspace, 'skill-manager.config.json'),
-      JSON.stringify(defaultConfig, null, 2)
-    )
+    await writeFile(path.join(tempWorkspace, 'skill-manager.config.json'), JSON.stringify(defaultConfig, null, 2))
 
     // Ensure library directories exist in temp workspace
     await mkdir(path.join(tempWorkspace, 'library', 'skills'), { recursive: true })
@@ -119,7 +116,7 @@ description: "A test skill for automation"
 
     await assert.rejects(
       importSkill(skillSourcePath, {}, tempWorkspace),
-      (err: any) => err instanceof AppError && err.code === 'SKILL_ALREADY_EXISTS'
+      (err: any) => err instanceof AppError && err.code === 'SKILL_ALREADY_EXISTS',
     )
   })
 
@@ -131,7 +128,7 @@ description: "A test skill for automation"
 
   it('forces overwrite with backup and safe copy when force option is provided', async () => {
     const skillSourcePath = path.join(tempWorkspace, 'test-skill')
-    
+
     // Write an extra file in the old canonical folder to test "safe copy" cleanup
     const extraFileInCanonical = path.join(tempWorkspace, 'library', 'skills', 'test-skill', 'leftover.txt')
     await writeFile(extraFileInCanonical, 'leftover file')
@@ -143,7 +140,10 @@ description: "A test skill for automation"
 
     // Verify leftover file is removed due to physical deletion of target dir before copy
     assert.ok(!(await pathExists(extraFileInCanonical)))
-    assert.equal(result.skill.checksum, await checksumDirectory(path.join(tempWorkspace, 'library', 'skills', 'test-skill')))
+    assert.equal(
+      result.skill.checksum,
+      await checksumDirectory(path.join(tempWorkspace, 'library', 'skills', 'test-skill')),
+    )
 
     // Verify backup created under backups/bk_*
     const backupIndexFile = path.join(tempWorkspace, 'backups', result.backupId!, 'index.json')
@@ -176,7 +176,7 @@ description: "A mismatching name skill"
 
     await assert.rejects(
       importSkill(skillSourcePath, {}, tempWorkspace),
-      (err: any) => err instanceof Error && err.message.includes('name must match directory name')
+      (err: any) => err instanceof Error && err.message.includes('name must match directory name'),
     )
   })
 })

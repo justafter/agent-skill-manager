@@ -22,7 +22,11 @@ export function watchRouter(): Router {
       if (!skillName) {
         throw new AppError('VALIDATION_ERROR', 'skillName is required.')
       }
-      const targetList = targets ? String(targets).split(',').map((t) => t.trim()) : undefined
+      const targetList = targets
+        ? String(targets)
+            .split(',')
+            .map((t) => t.trim())
+        : undefined
       await startWatch(skillName, targetList)
       res.json({ success: true, message: `Watch started for skill: ${skillName}` })
     } catch (error) {

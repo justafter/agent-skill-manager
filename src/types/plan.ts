@@ -4,9 +4,24 @@ export type PlanId = `pl_${string}`
 
 export type PlanItem =
   | { kind: 'create'; target: string; bytes: number; targetKey?: TargetKey; targetDir?: string }
-  | { kind: 'modify'; target: string; checksumBefore: string; checksumAfter: string; targetKey?: TargetKey; targetDir?: string }
+  | {
+      kind: 'modify'
+      target: string
+      checksumBefore: string
+      checksumAfter: string
+      targetKey?: TargetKey
+      targetDir?: string
+    }
   | { kind: 'skip'; target: string; reason: 'identical'; targetKey?: TargetKey; targetDir?: string }
-  | { kind: 'conflict'; target: string; managedBy?: string; checksumBefore: string; checksumAfter: string; targetKey?: TargetKey; targetDir?: string }
+  | {
+      kind: 'conflict'
+      target: string
+      managedBy?: string
+      checksumBefore: string
+      checksumAfter: string
+      targetKey?: TargetKey
+      targetDir?: string
+    }
   | { kind: 'delete'; target: string; targetKey?: TargetKey; targetDir?: string }
 
 export interface Plan {

@@ -27,12 +27,12 @@ describe('D8 Rule Templates Sync', () => {
 
     templateDir = path.join(tempWorkspace, 'library', 'rules')
     await mkdir(path.join(templateDir, 'claude'), { recursive: true })
-    
+
     // Write a dummy Claude rules template
     await writeFile(
       path.join(templateDir, 'claude', 'CLAUDE.md'),
       '<!-- BEGIN AgentSkillManager:claude -->\nLocal authority rules\n<!-- END AgentSkillManager:claude -->\n',
-      'utf8'
+      'utf8',
     )
 
     const defaultConfig = {
@@ -43,7 +43,7 @@ describe('D8 Rule Templates Sync', () => {
       targets: {
         claude: { enabled: true, userSkillPath: '', projectSkillPath: '.claude/skills', projectRuleFile: 'CLAUDE.md' },
         codex: { enabled: false, userSkillPath: '', projectSkillPath: '', projectRuleFile: '' },
-        gemini: { enabled: false, userSkillPath: '', projectSkillPath: '', projectRuleFile: '' }
+        gemini: { enabled: false, userSkillPath: '', projectSkillPath: '', projectRuleFile: '' },
       },
       projects: [
         {
@@ -52,14 +52,11 @@ describe('D8 Rule Templates Sync', () => {
           path: projDir,
           enabledAgents: ['claude'],
           allowProjectSkill: true,
-          allowProjectRule: true
-        }
-      ]
+          allowProjectRule: true,
+        },
+      ],
     }
-    await writeFile(
-      path.join(tempWorkspace, 'skill-manager.config.json'),
-      JSON.stringify(defaultConfig, null, 2)
-    )
+    await writeFile(path.join(tempWorkspace, 'skill-manager.config.json'), JSON.stringify(defaultConfig, null, 2))
   })
 
   after(async () => {
@@ -89,7 +86,8 @@ describe('D8 Rule Templates Sync', () => {
     assert.equal(plan.status, 'identical')
 
     // 4. Modify block content in project -> status should be 'block'
-    const modifiedContent = '<!-- BEGIN AgentSkillManager:claude -->\nUser modified rules\n<!-- END AgentSkillManager:claude -->\n'
+    const modifiedContent =
+      '<!-- BEGIN AgentSkillManager:claude -->\nUser modified rules\n<!-- END AgentSkillManager:claude -->\n'
     const userCustomComment = '# Custom Project Rules\n'
     await writeFile(targetFile, userCustomComment + modifiedContent, 'utf8')
 
@@ -111,19 +109,80 @@ describe('D8 Rule Templates Sync', () => {
     // 7. Apply overwrite -> file is completely replaced with template content
     await applyRuleSync('proj_test', 'claude', 'overwrite', tempWorkspace)
     content = await readFile(targetFile, 'utf8')
-    assert.equal(content.trim(), '<!-- BEGIN AgentSkillManager:claude -->\nLocal authority rules\n<!-- END AgentSkillManager:claude -->')
+    assert.equal(
+      content.trim(),
+      '<!-- BEGIN AgentSkillManager:claude -->\nLocal authority rules\n<!-- END AgentSkillManager:claude -->',
+    )
 
     // 8. Pull from project back to local template
     // Let's modify block in project
     await writeFile(
       targetFile,
       '<!-- BEGIN AgentSkillManager:claude -->\nNew pulled rules\n<!-- END AgentSkillManager:claude -->\n',
-      'utf8'
+      'utf8',
     )
     await applyRuleSync('proj_test', 'claude', 'pull', tempWorkspace)
 
     // Local template should be updated
     const templateContent = await readFile(path.join(templateDir, 'claude', 'CLAUDE.md'), 'utf8')
     assert.ok(templateContent.includes('New pulled rules'))
+  })
+
+  it('supports custom templates per project with name translation', async () => {
+    // 1. Create a custom template file
+    const customTplPath = path.join(templateDir, 'claude', 'react-frontend.md')
+    await writeFile(
+      customTplPath,
+      '<!-- BEGIN AgentSkillManager:claude -->\nReact frontend rules authority\n<!-- END AgentSkillManager:claude -->\n',
+      'utf8',
+    )
+
+    // 2. Configure a project to bind to this custom template
+    const config = await loadConfig(tempWorkspace)
+    const project = {
+      ...config.projects[0],
+      id: 'proj_custom_tpl',
+      ruleTemplates: {
+        claude: 'react-frontend.md',
+      },
+    }
+
+    // Write new config with the custom project
+    const newConfig = {
+      ...config,
+      projects: [project],
+    }
+    await writeFile(path.join(tempWorkspace, 'skill-manager.config.json'), JSON.stringify(newConfig, null, 2))
+
+    // Refresh memory config
+    const refreshedConfig = await loadConfig(tempWorkspace)
+    const targetFile = path.join(projDir, 'CLAUDE.md')
+
+    // Clean up project rule file
+    if (await pathExists(targetFile)) {
+      await rm(targetFile)
+    }
+
+    // 3. Plan rule sync -> status 'create', expected content should be react-frontend.md content
+    let plan = await planRuleSync(project, 'claude', tempWorkspace)
+    assert.equal(plan.status, 'create')
+    assert.ok(plan.patch.includes('+React frontend rules authority'))
+
+    // 4. Apply rules in block mode -> writes to CLAUDE.md (translation)
+    await applyRuleSync('proj_custom_tpl', 'claude', 'block', tempWorkspace)
+    assert.ok(await pathExists(targetFile))
+    let content = await readFile(targetFile, 'utf8')
+    assert.ok(content.includes('React frontend rules authority'))
+
+    // 5. Pull changes back -> updates react-frontend.md (translation)
+    await writeFile(
+      targetFile,
+      '<!-- BEGIN AgentSkillManager:claude -->\nEvolved react frontend rules\n<!-- END AgentSkillManager:claude -->\n',
+      'utf8',
+    )
+    await applyRuleSync('proj_custom_tpl', 'claude', 'pull', tempWorkspace)
+
+    const updatedTplContent = await readFile(customTplPath, 'utf8')
+    assert.ok(updatedTplContent.includes('Evolved react frontend rules'))
   })
 })

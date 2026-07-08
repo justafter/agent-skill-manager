@@ -26,7 +26,7 @@ describe('D9 Watch Mode', () => {
     await writeFile(
       path.join(devDir, 'SKILL.md'),
       '---\nname: dev-skill\ndescription: A dev skill\nversion: 1.0.0\n---\nInitial content\n',
-      'utf8'
+      'utf8',
     )
 
     targetUserDir = path.join(tempWorkspace, '.claude', 'skills')
@@ -38,16 +38,18 @@ describe('D9 Watch Mode', () => {
       ruleTemplateDir: './library/rules',
       server: { host: '127.0.0.1', port: 47821 },
       targets: {
-        claude: { enabled: true, userSkillPath: targetUserDir, projectSkillPath: '.claude/skills', projectRuleFile: 'CLAUDE.md' },
+        claude: {
+          enabled: true,
+          userSkillPath: targetUserDir,
+          projectSkillPath: '.claude/skills',
+          projectRuleFile: 'CLAUDE.md',
+        },
         codex: { enabled: false, userSkillPath: '', projectSkillPath: '', projectRuleFile: '' },
-        gemini: { enabled: false, userSkillPath: '', projectSkillPath: '', projectRuleFile: '' }
+        gemini: { enabled: false, userSkillPath: '', projectSkillPath: '', projectRuleFile: '' },
       },
-      projects: []
+      projects: [],
     }
-    await writeFile(
-      path.join(tempWorkspace, 'skill-manager.config.json'),
-      JSON.stringify(defaultConfig, null, 2)
-    )
+    await writeFile(path.join(tempWorkspace, 'skill-manager.config.json'), JSON.stringify(defaultConfig, null, 2))
 
     // Setup registry.json
     const defaultRegistry = {
@@ -60,15 +62,15 @@ describe('D9 Watch Mode', () => {
           localPath: devDir,
           checksum: 'initial-checksum',
           syncedTargets: ['claude:user'],
-          projectInstalls: []
-        }
-      }
+          projectInstalls: [],
+        },
+      },
     }
     await mkdir(path.join(tempWorkspace, 'library'), { recursive: true })
     await writeFile(
       path.join(tempWorkspace, 'library', 'registry.json'),
       JSON.stringify(defaultRegistry, null, 2),
-      'utf8'
+      'utf8',
     )
   })
 
@@ -129,23 +131,20 @@ describe('D9 Watch Mode', () => {
       path: projDir,
       enabledAgents: ['claude'],
       allowProjectSkill: true,
-      allowProjectRule: true
+      allowProjectRule: true,
     })
-    await writeFile(
-      path.join(tempWorkspace, 'skill-manager.config.json'),
-      JSON.stringify(currentConfig, null, 2)
-    )
+    await writeFile(path.join(tempWorkspace, 'skill-manager.config.json'), JSON.stringify(currentConfig, null, 2))
 
     // 2. Trigger manual scan
     const scanResult = await runRuleScan(tempWorkspace)
-    
+
     // 3. Verify scanResult contains the change
-    const change = scanResult.changes.find(c => c.projectId === 'proj-1' && c.agent === 'claude')
+    const change = scanResult.changes.find((c) => c.projectId === 'proj-1' && c.agent === 'claude')
     assert.ok(change, 'Should detect rule change for proj-1 and agent claude')
 
     // 4. Verify getRuleScanStatus returns the same changes
     const status = getRuleScanStatus()
-    const statusChange = status.changes.find(c => c.projectId === 'proj-1' && c.agent === 'claude')
+    const statusChange = status.changes.find((c) => c.projectId === 'proj-1' && c.agent === 'claude')
     assert.ok(statusChange, 'getRuleScanStatus should also return the changes')
   })
 })

@@ -12,7 +12,7 @@ const plans = new Map<PlanId, StoredPlan>()
 export function putPlan(plan: Plan, ttlMs = DEFAULT_TTL_MS): void {
   plans.set(plan.planId, {
     plan,
-    expiresAt: Date.now() + ttlMs
+    expiresAt: Date.now() + ttlMs,
   })
 }
 
@@ -56,11 +56,11 @@ export function getPlanStatus(planId: PlanId): {
       status: 'executed',
       plan: stored.plan,
       executedAt: stored.plan.executedAt,
-      appliedItems: stored.plan.appliedItems
+      appliedItems: stored.plan.appliedItems,
     }
   }
   return {
     status: 'pending',
-    plan: stored.plan
+    plan: stored.plan,
   }
 }

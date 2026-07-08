@@ -67,20 +67,20 @@
 
 ## 4. 路由清单与现状
 
-| 路由 | 方法 | 实现状态 | D5 待办 |
-| --- | --- | --- | --- |
-| `/api/health` | GET | ✅ | 无 |
-| `/api/config` | GET | ✅ | 接入错误中间件；`PUT /api/config` 可选补 |
-| `/api/skills` | GET | ✅ | 接入错误中间件；返回结构与首版需求一致 |
-| `/api/scan` | POST | ✅ | 接入错误中间件；可选加 zod |
-| `/api/import` | POST | ✅ | 接入错误中间件 + zod |
-| `/api/sync/plan` | POST | ⚠️ 未透传 `from` | 加 `from` 字段 + zod |
-| `/api/sync/apply` | POST | ✅ | 接入错误中间件 + zod |
-| `/api/diff` | GET | ✅ 双语义 | 接入错误中间件；可选拆分两个端点 |
-| `/api/backups` | GET/POST | ✅ | 接入错误中间件；POST 加 zod |
-| `/api/restore` | POST | ✅ | 接入错误中间件 + zod |
-| `/api/watch/start`、`/api/watch/stop` | POST | ⚠️ 501 | D9 范围，D5 不动 |
-| `/api/projects` | GET | ⚠️ 仅返回空数组 | D7 范围；D5 把硬编码空数组改为从 `loadConfig().projects` 读取，避免 D7 实施时出现两套路径 |
+| 路由                                  | 方法     | 实现状态         | D5 待办                                                                                   |
+| ------------------------------------- | -------- | ---------------- | ----------------------------------------------------------------------------------------- |
+| `/api/health`                         | GET      | ✅               | 无                                                                                        |
+| `/api/config`                         | GET      | ✅               | 接入错误中间件；`PUT /api/config` 可选补                                                  |
+| `/api/skills`                         | GET      | ✅               | 接入错误中间件；返回结构与首版需求一致                                                    |
+| `/api/scan`                           | POST     | ✅               | 接入错误中间件；可选加 zod                                                                |
+| `/api/import`                         | POST     | ✅               | 接入错误中间件 + zod                                                                      |
+| `/api/sync/plan`                      | POST     | ⚠️ 未透传 `from` | 加 `from` 字段 + zod                                                                      |
+| `/api/sync/apply`                     | POST     | ✅               | 接入错误中间件 + zod                                                                      |
+| `/api/diff`                           | GET      | ✅ 双语义        | 接入错误中间件；可选拆分两个端点                                                          |
+| `/api/backups`                        | GET/POST | ✅               | 接入错误中间件；POST 加 zod                                                               |
+| `/api/restore`                        | POST     | ✅               | 接入错误中间件 + zod                                                                      |
+| `/api/watch/start`、`/api/watch/stop` | POST     | ⚠️ 501           | D9 范围，D5 不动                                                                          |
+| `/api/projects`                       | GET      | ⚠️ 仅返回空数组  | D7 范围；D5 把硬编码空数组改为从 `loadConfig().projects` 读取，避免 D7 实施时出现两套路径 |
 
 ## 5. CLI 与 server 一致性
 
@@ -102,6 +102,7 @@
 7. **zod 校验失败**：body 缺字段时返回 400 + `code: 'VALIDATION_ERROR'`。
 
 执行：
+
 - `pnpm run typecheck`
 - `pnpm run test`
 

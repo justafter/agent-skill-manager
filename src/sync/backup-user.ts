@@ -13,7 +13,7 @@ export async function backupBeforeSync(
   backupDir: string,
   targetAgent: AgentId,
   skillName: string,
-  reason: string
+  reason: string,
 ): Promise<string> {
   try {
     const config = await loadConfig(root)
@@ -44,7 +44,7 @@ export async function backupBeforeSync(
       items.push({
         type: 'registry',
         originalPath: registryPath,
-        backupPath: backupRegistryPath
+        backupPath: backupRegistryPath,
       })
     }
 
@@ -62,23 +62,19 @@ export async function backupBeforeSync(
       backupPath: backupSkillPath,
       targetType: 'user',
       targetAgent,
-      targetSkillPath
+      targetSkillPath,
     })
 
     const index: BackupIndex = {
       backupId,
       createdAt: new Date().toISOString(),
       reason,
-      items
+      items,
     }
 
     await atomicWriteJson(path.join(destDir, 'index.json'), index)
     return backupId
   } catch (error) {
-    throw new AppError(
-      'BACKUP_FAILED',
-      `Sync backup failed: ${(error as Error).message}`,
-      { originalError: error }
-    )
+    throw new AppError('BACKUP_FAILED', `Sync backup failed: ${(error as Error).message}`, { originalError: error })
   }
 }

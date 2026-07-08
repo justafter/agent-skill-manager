@@ -1,9 +1,27 @@
 import { useState } from 'react'
 import { useApi } from '../hooks/useApi'
-import { apiPost, apiGet } from '../api/client'
+import { apiPost, apiGet, apiDelete } from '../api/client'
 import { PlanResult } from '../components/PlanConfirmDialog'
 import { DiffView } from '../components/DiffView'
 import { DirectoryPicker } from '../components/DirectoryPicker'
+
+interface RemovePreviewSkillInstall {
+  skill: string
+  agent: string
+  absolutePath: string
+  exists: boolean
+}
+interface RemovePreviewRuleFile {
+  agent: string
+  file: string
+  absolutePath: string
+  exists: boolean
+}
+interface RemovePreview {
+  project: { id: string; name: string; path: string }
+  skillInstalls: RemovePreviewSkillInstall[]
+  ruleFiles: RemovePreviewRuleFile[]
+}
 
 export function ProjectSpacePage() {
   const { data: projectsData, refetch, isLoading } = useApi<any>('projects', '/api/projects')
@@ -38,6 +56,15 @@ export function ProjectSpacePage() {
   const [isFetchingRuleDiff, setIsFetchingRuleDiff] = useState(false)
   const [isSyncingRule, setIsSyncingRule] = useState(false)
 
+  // Remove Project State
+  const [removeDialogOpen, setRemoveDialogOpen] = useState(false)
+  const [removeTarget, setRemoveTarget] = useState<any | null>(null)
+  const [removePreview, setRemovePreview] = useState<RemovePreview | null>(null)
+  const [isLoadingRemovePreview, setIsLoadingRemovePreview] = useState(false)
+  const [removeConfirmed, setRemoveConfirmed] = useState(false)
+  const [isRemoving, setIsRemoving] = useState(false)
+  const [removeError, setRemoveError] = useState<string | null>(null)
+
   const handleAddProject = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!projectName.trim() || !projectPath.trim()) return
@@ -46,7 +73,7 @@ export function ProjectSpacePage() {
       setIsAdding(true)
       await apiPost('/api/projects', {
         name: projectName.trim(),
-        path: projectPath.trim()
+        path: projectPath.trim(),
       })
       alert(`[成功] 项目 "${projectName}" 注册成功！`)
       setAddDialogOpen(false)
@@ -110,7 +137,7 @@ export function ProjectSpacePage() {
       setPlanErrorMessage(null)
       const res = await apiPost<PlanResult>(`/api/projects/${selectedProject.id}/inject/plan`, {
         skillName: selectedSkillName,
-        agent: selectedAgent
+        agent: selectedAgent,
       })
       setInjectPlanResult(res)
     } catch (err) {
@@ -129,7 +156,7 @@ export function ProjectSpacePage() {
       setPlanErrorMessage(null)
       await apiPost(`/api/projects/${selectedProject.id}/inject/apply`, {
         planId: injectPlanResult.plan.planId,
-        allowManagedModify
+        allowManagedModify,
       })
       alert(`[成功] Skill 成功注入到项目 "${selectedProject.name}"！`)
       setInjectDialogOpen(false)
@@ -150,7 +177,7 @@ export function ProjectSpacePage() {
       setIsSyncingRule(true)
       await apiPost(`/api/projects/${selectedProject.id}/rules/sync`, {
         agent: selectedRuleAgent,
-        mode
+        mode,
       })
       alert(`[成功] 规则已成功推送至项目 "${selectedProject.name}"！`)
       await fetchRuleDiff(selectedProject.id, selectedRuleAgent)
@@ -170,7 +197,7 @@ export function ProjectSpacePage() {
       setIsSyncingRule(true)
       await apiPost(`/api/projects/${selectedProject.id}/rules/sync`, {
         agent: selectedRuleAgent,
-        mode: 'pull'
+        mode: 'pull',
       })
       alert(`[成功] 已成功从项目拉取最新规则，并更新本地权威模板！`)
       await fetchRuleDiff(selectedProject.id, selectedRuleAgent)
@@ -181,8 +208,62 @@ export function ProjectSpacePage() {
     }
   }
 
+  const handleOpenRemoveDialog = async (project: any) => {
+    setRemoveTarget(project)
+    setRemoveDialogOpen(true)
+    setRemovePreview(null)
+    setRemoveConfirmed(false)
+    setRemoveError(null)
+    setIsLoadingRemovePreview(true)
+    try {
+      const preview = await apiGet<RemovePreview>(`/api/projects/${project.id}/remove-preview`)
+      setRemovePreview(preview)
+    } catch (err) {
+      setRemoveError((err as Error).message)
+    } finally {
+      setIsLoadingRemovePreview(false)
+    }
+  }
+
+  const handleCloseRemoveDialog = () => {
+    if (isRemoving) return
+    setRemoveDialogOpen(false)
+    setRemoveTarget(null)
+    setRemovePreview(null)
+    setRemoveConfirmed(false)
+    setRemoveError(null)
+  }
+
+  const handleConfirmRemove = async () => {
+    if (!removeTarget || !removeConfirmed) return
+    try {
+      setIsRemoving(true)
+      setRemoveError(null)
+      const res = await apiDelete<{ success: boolean; projects: any[]; backupPath: string }>(
+        `/api/projects/${removeTarget.id}`,
+        { confirmed: true },
+      )
+      alert(
+        `[成功] 已解除注册 "${removeTarget.name}"。\n配置备份已保存至: ${res.backupPath}`,
+      )
+      setRemoveDialogOpen(false)
+      setRemoveTarget(null)
+      setRemovePreview(null)
+      setRemoveConfirmed(false)
+      await refetch()
+    } catch (err) {
+      setRemoveError((err as Error).message)
+    } finally {
+      setIsRemoving(false)
+    }
+  }
+
   if (isLoading || !projectsData) {
-    return <div className="page"><div className="empty-state">正在加载项目列表...</div></div>
+    return (
+      <div className="page">
+        <div className="empty-state">正在加载项目列表...</div>
+      </div>
+    )
   }
 
   const projects = projectsData.projects || []
@@ -241,8 +322,12 @@ export function ProjectSpacePage() {
                   物理路径: {project.path}
                 </p>
                 <div style={{ display: 'flex', gap: '12px', marginTop: '6px', fontSize: '12px', color: '#64748b' }}>
-                  <span>检测到 Skill 目录: <strong>{project.scan?.skillDirs?.length || 0}</strong> 个</span>
-                  <span>检测到 Rule 文件: <strong>{project.scan?.ruleFiles?.length || 0}</strong> 个</span>
+                  <span>
+                    检测到 Skill 目录: <strong>{project.scan?.skillDirs?.length || 0}</strong> 个
+                  </span>
+                  <span>
+                    检测到 Rule 文件: <strong>{project.scan?.ruleFiles?.length || 0}</strong> 个
+                  </span>
                   {(project.scan?.skillDirs?.length || 0) + (project.scan?.ruleFiles?.length || 0) > 0 && (
                     <button
                       type="button"
@@ -253,12 +338,12 @@ export function ProjectSpacePage() {
                         cursor: 'pointer',
                         padding: 0,
                         fontSize: '12px',
-                        textDecoration: 'underline'
+                        textDecoration: 'underline',
                       }}
                       onClick={() =>
                         setExpandedProjects((prev) => ({
                           ...prev,
-                          [project.id]: !prev[project.id]
+                          [project.id]: !prev[project.id],
                         }))
                       }
                     >
@@ -274,7 +359,7 @@ export function ProjectSpacePage() {
                       background: '#f8fafc',
                       border: '1px solid #e2e8f0',
                       borderRadius: '4px',
-                      fontSize: '12px'
+                      fontSize: '12px',
                     }}
                   >
                     {(project.scan?.skillDirs?.length || 0) > 0 && (
@@ -287,7 +372,7 @@ export function ProjectSpacePage() {
                               fontFamily: 'monospace',
                               color: '#1e293b',
                               wordBreak: 'break-all',
-                              paddingLeft: '12px'
+                              paddingLeft: '12px',
                             }}
                           >
                             {dir}
@@ -305,7 +390,7 @@ export function ProjectSpacePage() {
                               fontFamily: 'monospace',
                               color: '#1e293b',
                               wordBreak: 'break-all',
-                              paddingLeft: '12px'
+                              paddingLeft: '12px',
                             }}
                           >
                             {file}
@@ -323,6 +408,18 @@ export function ProjectSpacePage() {
                   onClick={() => handleOpenInjectDialog(project)}
                 >
                   管理工作区
+                </button>
+                <button
+                  className="button"
+                  style={{
+                    border: '1px solid #fecaca',
+                    color: '#b91c1c',
+                    background: '#fef2f2',
+                    marginLeft: '8px',
+                  }}
+                  onClick={() => handleOpenRemoveDialog(project)}
+                >
+                  移除项目
                 </button>
               </div>
             </div>
@@ -377,12 +474,7 @@ export function ProjectSpacePage() {
               </div>
 
               <div className="modal-footer">
-                <button
-                  type="button"
-                  className="button"
-                  onClick={() => setAddDialogOpen(false)}
-                  disabled={isAdding}
-                >
+                <button type="button" className="button" onClick={() => setAddDialogOpen(false)} disabled={isAdding}>
                   取消
                 </button>
                 <button type="submit" className="button button-primary" disabled={isAdding}>
@@ -397,7 +489,11 @@ export function ProjectSpacePage() {
       {/* 2. Project Details Modal (Skill Inject & Rule Sync) */}
       {injectDialogOpen && selectedProject && (
         <div className="modal-overlay" onClick={() => setInjectDialogOpen(false)}>
-          <div className="modal-content" style={{ maxWidth: '640px', width: '90%' }} onClick={(e) => e.stopPropagation()}>
+          <div
+            className="modal-content"
+            style={{ maxWidth: '640px', width: '90%' }}
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="modal-header">
               <span>项目工作区管理 - {selectedProject.name}</span>
               <button
@@ -413,7 +509,9 @@ export function ProjectSpacePage() {
 
             <div className="modal-body">
               <div style={{ marginBottom: '16px', fontSize: '13px', color: '#64748b' }}>
-                <div><strong>项目路径:</strong> {selectedProject.path}</div>
+                <div>
+                  <strong>项目路径:</strong> {selectedProject.path}
+                </div>
               </div>
 
               {/* Tabs */}
@@ -499,7 +597,7 @@ export function ProjectSpacePage() {
                         border: '1px solid #ffc8c4',
                         padding: '12px',
                         margin: '16px 0',
-                        fontSize: '13px'
+                        fontSize: '13px',
                       }}
                     >
                       {planErrorMessage}
@@ -509,20 +607,14 @@ export function ProjectSpacePage() {
                   {injectPlanResult && (
                     <div style={{ marginTop: '20px', borderTop: '1px solid #e2e8f0', paddingTop: '16px' }}>
                       <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', color: '#1e293b' }}>同步计划预览</h4>
-                      
+
                       <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
                         <span className="badge badge-missing" style={{ background: '#e1f5fe', color: '#0288d1' }}>
                           新增: {injectPlanResult.summary.create}
                         </span>
-                        <span className="badge badge-changed">
-                          修改: {injectPlanResult.summary.modify}
-                        </span>
-                        <span className="badge badge-identical">
-                          跳过: {injectPlanResult.summary.skip}
-                        </span>
-                        <span className="badge badge-conflict">
-                          冲突: {injectPlanResult.summary.conflict}
-                        </span>
+                        <span className="badge badge-changed">修改: {injectPlanResult.summary.modify}</span>
+                        <span className="badge badge-identical">跳过: {injectPlanResult.summary.skip}</span>
+                        <span className="badge badge-conflict">冲突: {injectPlanResult.summary.conflict}</span>
                       </div>
 
                       {injectPlanResult.summary.conflict > 0 && (
@@ -533,10 +625,12 @@ export function ProjectSpacePage() {
                             padding: '12px',
                             borderRadius: '6px',
                             border: '1px solid #fef3c7',
-                            marginBottom: '16px'
+                            marginBottom: '16px',
                           }}
                         >
-                          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', margin: 0 }}>
+                          <label
+                            style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', margin: 0 }}
+                          >
                             <input
                               type="checkbox"
                               checked={allowManagedModify}
@@ -551,7 +645,14 @@ export function ProjectSpacePage() {
                       )}
 
                       <div style={{ fontWeight: 600, fontSize: '13px', marginBottom: '8px' }}>变更细节:</div>
-                      <div style={{ border: '1px solid #e6ebf1', borderRadius: '6px', maxHeight: '160px', overflowY: 'auto' }}>
+                      <div
+                        style={{
+                          border: '1px solid #e6ebf1',
+                          borderRadius: '6px',
+                          maxHeight: '160px',
+                          overflowY: 'auto',
+                        }}
+                      >
                         {injectPlanResult.plan.items.map((item: any, idx: number) => (
                           <div
                             key={idx}
@@ -561,14 +662,22 @@ export function ProjectSpacePage() {
                               justifyContent: 'space-between',
                               padding: '8px 12px',
                               borderBottom: idx < injectPlanResult.plan.items.length - 1 ? '1px solid #e6ebf1' : 'none',
-                              fontSize: '12px'
+                              fontSize: '12px',
                             }}
                           >
                             <div style={{ color: '#475569', wordBreak: 'break-all', paddingRight: '12px' }}>
                               {item.target}
                             </div>
-                            <span className={`badge badge-${item.kind === 'skip' ? 'identical' : item.kind === 'modify' ? 'changed' : item.kind}`}>
-                              {item.kind === 'create' ? '新增' : item.kind === 'modify' ? '修改' : item.kind === 'skip' ? '跳过' : '冲突'}
+                            <span
+                              className={`badge badge-${item.kind === 'skip' ? 'identical' : item.kind === 'modify' ? 'changed' : item.kind}`}
+                            >
+                              {item.kind === 'create'
+                                ? '新增'
+                                : item.kind === 'modify'
+                                  ? '修改'
+                                  : item.kind === 'skip'
+                                    ? '跳过'
+                                    : '冲突'}
                             </span>
                           </div>
                         ))}
@@ -592,7 +701,8 @@ export function ProjectSpacePage() {
                       >
                         {selectedProject.enabledAgents.map((a: string) => (
                           <option key={a} value={a}>
-                            {a.toUpperCase()} ({a === 'claude' ? 'CLAUDE.md' : a === 'codex' ? 'AGENTS.md' : 'GEMINI.md'})
+                            {a.toUpperCase()} (
+                            {a === 'claude' ? 'CLAUDE.md' : a === 'codex' ? 'AGENTS.md' : 'GEMINI.md'})
                           </option>
                         ))}
                       </select>
@@ -627,15 +737,25 @@ export function ProjectSpacePage() {
                     <div className="empty-state">正在计算规则文件差异...</div>
                   ) : ruleDiff ? (
                     <div>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          marginBottom: '12px',
+                        }}
+                      >
                         <div style={{ fontSize: '13px', color: '#475569' }}>
-                          规则同步状态: 
-                          <span 
+                          规则同步状态:
+                          <span
                             className={`badge ${getRuleStatusLabelAndStyle(ruleDiff.status).className}`}
                             style={{ marginLeft: '8px' }}
                           >
                             {getRuleStatusLabelAndStyle(ruleDiff.status).label}
                           </span>
+                        </div>
+                        <div style={{ fontSize: '12px', color: '#64748b' }}>
+                          当前比对模板: <code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '3px' }}>{ruleDiff.templateName || '未知'}</code>
                         </div>
                       </div>
 
@@ -647,10 +767,12 @@ export function ProjectSpacePage() {
                             padding: '12px',
                             borderRadius: '6px',
                             border: '1px solid #fef3c7',
-                            marginBottom: '16px'
+                            marginBottom: '16px',
                           }}
                         >
-                          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', margin: 0 }}>
+                          <label
+                            style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', margin: 0 }}
+                          >
                             <input
                               type="checkbox"
                               checked={ruleOverwrite}
@@ -697,6 +819,158 @@ export function ProjectSpacePage() {
                   {isSubmittingPlan ? '正在应用...' : '确认注入'}
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 3. Remove Project Dialog */}
+      {removeDialogOpen && removeTarget && (
+        <div className="modal-overlay" onClick={handleCloseRemoveDialog}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '560px' }}>
+            <div className="modal-header">
+              <span>移除项目 {removeTarget.name}</span>
+              <button
+                type="button"
+                className="button"
+                style={{ padding: '4px 8px' }}
+                onClick={handleCloseRemoveDialog}
+                disabled={isRemoving}
+              >
+                &times;
+              </button>
+            </div>
+
+            <div className="modal-body">
+              <div
+                style={{
+                  background: '#fef2f2',
+                  border: '1px solid #fecaca',
+                  color: '#b91c1c',
+                  padding: '10px 12px',
+                  borderRadius: '6px',
+                  fontSize: '13px',
+                  marginBottom: '16px',
+                }}
+              >
+                以下文件不会被删除，移除后仅不再受本工具管理。
+              </div>
+
+              {isLoadingRemovePreview ? (
+                <div className="empty-state">正在加载影响预览...</div>
+              ) : removePreview ? (
+                <div style={{ fontSize: '13px' }}>
+                  <div style={{ marginBottom: '8px' }}>
+                    <strong>待移除注册记录：</strong>
+                    <div style={{ fontFamily: 'monospace', paddingLeft: '12px', marginTop: '4px' }}>
+                      ID: {removePreview.project.id}
+                      <br />
+                      Name: {removePreview.project.name}
+                      <br />
+                      Path: {removePreview.project.path}
+                    </div>
+                  </div>
+
+                  <div style={{ marginBottom: '12px' }}>
+                    <strong>项目级 Skill 安装：</strong>
+                    {removePreview.skillInstalls.length === 0 ? (
+                      <div style={{ paddingLeft: '12px', color: '#64748b' }}>(无)</div>
+                    ) : (
+                      <ul style={{ paddingLeft: '24px', margin: '4px 0' }}>
+                        {removePreview.skillInstalls.map((s, i) => (
+                          <li key={`s-${i}`} style={{ fontFamily: 'monospace', marginBottom: '2px' }}>
+                            [{s.agent}] {s.skill} — {s.absolutePath}{' '}
+                            <span style={{ color: s.exists ? '#15803d' : '#94a3b8' }}>
+                              ({s.exists ? '存在' : '缺失'})
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+
+                  <div style={{ marginBottom: '12px' }}>
+                    <strong>项目级规则文件：</strong>
+                    {removePreview.ruleFiles.length === 0 ? (
+                      <div style={{ paddingLeft: '12px', color: '#64748b' }}>(无)</div>
+                    ) : (
+                      <ul style={{ paddingLeft: '24px', margin: '4px 0' }}>
+                        {removePreview.ruleFiles.map((r, i) => (
+                          <li key={`r-${i}`} style={{ fontFamily: 'monospace', marginBottom: '2px' }}>
+                            [{r.agent}] {r.file} — {r.absolutePath}{' '}
+                            <span style={{ color: r.exists ? '#15803d' : '#94a3b8' }}>
+                              ({r.exists ? '存在' : '缺失'})
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+
+                  <div style={{ fontSize: '12px', color: '#475569', marginTop: '12px' }}>
+                    移除前将自动备份当前 config.json 到 <code>backups/config-snapshots/</code>。
+                  </div>
+                </div>
+              ) : (
+                <div className="empty-state">无法加载预览。</div>
+              )}
+
+              {removeError && (
+                <div
+                  style={{
+                    background: '#ffebe9',
+                    border: '1px solid #ffc8c4',
+                    color: '#b91c1c',
+                    padding: '10px 12px',
+                    borderRadius: '6px',
+                    fontSize: '13px',
+                    marginTop: '12px',
+                  }}
+                >
+                  {removeError}
+                </div>
+              )}
+
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  cursor: 'pointer',
+                  marginTop: '16px',
+                  padding: '10px 12px',
+                  background: '#fffbeb',
+                  border: '1px solid #fef3c7',
+                  borderRadius: '6px',
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={removeConfirmed}
+                  onChange={(e) => setRemoveConfirmed(e.target.checked)}
+                  disabled={isRemoving || isLoadingRemovePreview || !removePreview}
+                />
+                <span style={{ fontSize: '13px', fontWeight: 500, color: '#92400e' }}>
+                  我已了解上述文件不会被删除
+                </span>
+              </label>
+            </div>
+
+            <div className="modal-footer">
+              <button className="button" onClick={handleCloseRemoveDialog} disabled={isRemoving}>
+                取消
+              </button>
+              <button
+                className="button button-primary"
+                onClick={handleConfirmRemove}
+                disabled={isRemoving || !removeConfirmed || isLoadingRemovePreview || !removePreview}
+                style={{
+                  background: removeConfirmed && !isRemoving ? '#dc2626' : undefined,
+                  borderColor: removeConfirmed && !isRemoving ? '#dc2626' : undefined,
+                }}
+              >
+                {isRemoving ? '正在移除...' : '确认移除'}
+              </button>
             </div>
           </div>
         </div>

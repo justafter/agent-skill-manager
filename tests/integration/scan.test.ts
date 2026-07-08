@@ -39,27 +39,24 @@ describe('D2 User-level Scan, List & Diff', () => {
           enabled: true,
           userSkillPath: claudeSkillsDir,
           projectSkillPath: '',
-          projectRuleFile: ''
+          projectRuleFile: '',
         },
         codex: {
           enabled: false,
           userSkillPath: '',
           projectSkillPath: '',
-          projectRuleFile: ''
+          projectRuleFile: '',
         },
         gemini: {
           enabled: false,
           userSkillPath: '',
           projectSkillPath: '',
-          projectRuleFile: ''
-        }
+          projectRuleFile: '',
+        },
       },
-      projects: []
+      projects: [],
     }
-    await writeFile(
-      path.join(tempWorkspace, 'skill-manager.config.json'),
-      JSON.stringify(defaultConfig, null, 2)
-    )
+    await writeFile(path.join(tempWorkspace, 'skill-manager.config.json'), JSON.stringify(defaultConfig, null, 2))
 
     await mkdir(path.join(tempWorkspace, 'library', 'skills'), { recursive: true })
   })
@@ -85,14 +82,14 @@ describe('D2 User-level Scan, List & Diff', () => {
       checksum: 'sha256:source-checksum' as any,
       localPath: sourceDir,
       syncedTargets: [],
-      projectInstalls: []
+      projectInstalls: [],
     }
     await saveRegistry(registry, tempWorkspace)
 
     // 2. Scan targets. Codex is disabled, Claude is enabled but empty.
     const config = await loadConfig(tempWorkspace)
     const adapters = createAdapters(config)
-    
+
     // Test scanUserSkills when empty
     const claudeAdapter = adapters.claude
     const scanned = await claudeAdapter.scanUserSkills()
@@ -107,7 +104,10 @@ describe('D2 User-level Scan, List & Diff', () => {
     const skillName = 'scan-skill'
     const targetSkillDir = path.join(claudeSkillsDir, skillName)
     await mkdir(targetSkillDir, { recursive: true })
-    await writeFile(path.join(targetSkillDir, 'SKILL.md'), '---\nname: scan-skill\nversion: 1.0.0\ndescription: test\n---\n')
+    await writeFile(
+      path.join(targetSkillDir, 'SKILL.md'),
+      '---\nname: scan-skill\nversion: 1.0.0\ndescription: test\n---\n',
+    )
 
     const config = await loadConfig(tempWorkspace)
     const adapters = createAdapters(config)
@@ -119,7 +119,7 @@ describe('D2 User-level Scan, List & Diff', () => {
 
     const registry = await loadRegistry(tempWorkspace)
     const sourceSkill = registry.skills[skillName]
-    
+
     // Set checksum to match
     sourceSkill.checksum = targetInfo.checksum
     await saveRegistry(registry, tempWorkspace)
@@ -157,7 +157,7 @@ describe('D2 User-level Scan, List & Diff', () => {
       sourcePath: 'dummy',
       sourceHash: 'dummy',
       target: 'claude:user',
-      deployedAt: '2026-07-06'
+      deployedAt: '2026-07-06',
     })
 
     const config = await loadConfig(tempWorkspace)
@@ -179,14 +179,17 @@ describe('D2 User-level Scan, List & Diff', () => {
     const untrackedSkillName = 'untracked-skill'
     const targetSkillDir = path.join(claudeSkillsDir, untrackedSkillName)
     await mkdir(targetSkillDir, { recursive: true })
-    await writeFile(path.join(targetSkillDir, 'SKILL.md'), '---\nname: untracked-skill\nversion: 1.0.0\ndescription: untracked\n---\n')
+    await writeFile(
+      path.join(targetSkillDir, 'SKILL.md'),
+      '---\nname: untracked-skill\nversion: 1.0.0\ndescription: untracked\n---\n',
+    )
 
     const config = await loadConfig(tempWorkspace)
     const adapters = createAdapters(config)
     const targetSkills = await adapters.claude.scanUserSkills()
-    
+
     assert.ok(targetSkills[untrackedSkillName])
-    
+
     const registry = await loadRegistry(tempWorkspace)
     assert.ok(!registry.skills[untrackedSkillName])
   })
@@ -197,29 +200,53 @@ describe('D2 User-level Scan, List & Diff', () => {
     await mkdir(skillSourcePath, { recursive: true })
     await writeFile(
       path.join(skillSourcePath, 'SKILL.md'),
-      '---\nname: dev-drift-skill\nversion: 1.0.0\ndescription: dev drift\n---\n'
+      '---\nname: dev-drift-skill\nversion: 1.0.0\ndescription: dev drift\n---\n',
     )
 
     const imported = await importSkill(skillSourcePath, {}, tempWorkspace)
     assert.equal(imported.status, 'imported')
 
     let registry = await loadRegistry(tempWorkspace)
-    let devState = await scanDevelopmentSkill(registry.skills[skillName])
+    let devState = await scanDevelopmentSkill(registry.skills[skillName], tempWorkspace)
     assert.equal(devState.status, 'identical')
 
     await writeFile(
       path.join(skillSourcePath, 'SKILL.md'),
-      '---\nname: dev-drift-skill\nversion: 1.0.1\ndescription: dev drift changed\n---\n'
+      '---\nname: dev-drift-skill\nversion: 1.0.1\ndescription: dev drift changed\n---\n',
     )
 
     registry = await loadRegistry(tempWorkspace)
-    devState = await scanDevelopmentSkill(registry.skills[skillName])
+    devState = await scanDevelopmentSkill(registry.skills[skillName], tempWorkspace)
     assert.equal(devState.status, 'changed')
 
     await importSkill(skillSourcePath, { force: true }, tempWorkspace)
     registry = await loadRegistry(tempWorkspace)
-    devState = await scanDevelopmentSkill(registry.skills[skillName])
+    devState = await scanDevelopmentSkill(registry.skills[skillName], tempWorkspace)
     assert.equal(devState.status, 'identical')
+  })
+
+  it('detects development drift against real local library when registry checksum is stale', async () => {
+    const skillName = 'stale-registry-dev-skill'
+    const skillSourcePath = path.join(tempWorkspace, skillName)
+    await mkdir(skillSourcePath, { recursive: true })
+    await writeFile(
+      path.join(skillSourcePath, 'SKILL.md'),
+      '---\nname: stale-registry-dev-skill\nversion: 1.0.0\ndescription: stale registry\n---\nDevelopment Version',
+    )
+
+    const imported = await importSkill(skillSourcePath, {}, tempWorkspace)
+    assert.equal(imported.status, 'imported')
+
+    const localLibraryPath = path.join(tempWorkspace, 'library', 'skills', skillName)
+    await writeFile(
+      path.join(localLibraryPath, 'SKILL.md'),
+      '---\nname: stale-registry-dev-skill\nversion: 1.0.1\ndescription: stale registry local\n---\nLocal Library Version',
+    )
+
+    const registry = await loadRegistry(tempWorkspace)
+    const devState = await scanDevelopmentSkill(registry.skills[skillName], tempWorkspace)
+    assert.equal(devState.status, 'changed')
+    assert.notEqual(devState.checksum, devState.libraryChecksum)
   })
 
   it('diffs directories correctly for added, removed and changed files', async () => {

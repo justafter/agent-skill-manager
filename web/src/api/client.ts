@@ -1,26 +1,62 @@
 export async function apiGet<T>(path: string): Promise<T> {
   const response = await fetch(path)
-  if (!response.ok) {
-    throw new Error(`Request failed: ${response.status}`)
-  }
-  return response.json() as Promise<T>
+  await throwIfError(response)
+  return (await response.json()) as T
 }
 
 export async function apiPost<T>(path: string, body?: any): Promise<T> {
   const response = await fetch(path, {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
     },
-    body: body ? JSON.stringify(body) : undefined
+    body: body ? JSON.stringify(body) : undefined,
   })
-  if (!response.ok) {
-    const errText = await response.text().catch(() => '')
-    let errJson
-    try {
-      errJson = JSON.parse(errText)
-    } catch {}
-    throw new Error(errJson?.error || errText || `Request failed: ${response.status}`)
+  await throwIfError(response)
+  return (await response.json()) as T
+}
+
+export async function apiPut<T>(path: string, body?: any): Promise<T> {
+  const response = await fetch(path, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  })
+  await throwIfError(response)
+  return (await response.json()) as T
+}
+
+export async function apiDelete<T>(path: string, body?: any): Promise<T> {
+  const response = await fetch(path, {
+    method: 'DELETE',
+    headers: body ? { 'Content-Type': 'application/json' } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+  })
+  await throwIfError(response)
+  return (await response.json()) as T
+}
+
+async function throwIfError(response: Response): Promise<void> {
+  if (response.ok) return
+  let errMsg = `Request failed: ${response.status}`
+  try {
+    const errText = await response.text()
+    if (errText) {
+      try {
+        const errJson = JSON.parse(errText)
+        if (errJson?.error?.message) {
+          errMsg = `[${errJson.error.code}] ${errJson.error.message}`
+        } else if (typeof errJson === 'string') {
+          errMsg = errJson
+        }
+      } catch {
+        errMsg = errText || errMsg
+      }
+    }
+  } catch {
+    // ignore body read errors
   }
-  return response.json() as Promise<T>
+  throw new Error(errMsg)
 }

@@ -5,7 +5,7 @@ export type SkillSyncStatus = 'identical' | 'missing' | 'changed' | 'conflict'
 
 export function identifySkillState(
   source: SkillState | undefined,
-  target: TargetSkillInfo | undefined
+  target: TargetSkillInfo | undefined,
 ): SkillSyncStatus {
   if (!target || !target.detected) {
     return 'missing'

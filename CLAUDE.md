@@ -1,6 +1,7 @@
 # CLAUDE.md
 
 <!-- BEGIN AgentSkillManager:claude -->
+
 ## 项目定位
 
 本项目是本地优先的 Agent Skill Manager，用于统一维护 Agent Skills、项目级 Agent 规则文件，并同步到 Claude Code、Codex、Gemini / Antigravity 等本机 Agent 环境。
@@ -65,4 +66,5 @@
 - 说明验证了什么。
 - 说明还有什么风险或未完成项。
 - 文件路径使用可定位的项目路径。
+
 <!-- END AgentSkillManager:claude -->

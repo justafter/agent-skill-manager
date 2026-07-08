@@ -22,13 +22,13 @@ export function ruleTemplateDirRouter(): Router {
       const absolute = !raw
         ? null
         : path.isAbsolute(raw)
-        ? raw
-        : path.resolve(config.workspaceRoot || process.cwd(), raw)
+          ? raw
+          : path.resolve(config.workspaceRoot || process.cwd(), raw)
 
       res.json({
         raw: raw || null,
         absolute,
-        missing: absolute ? !(await pathExists(absolute)) : true
+        missing: absolute ? !(await pathExists(absolute)) : true,
       })
     } catch (error) {
       next(error)
@@ -48,9 +48,7 @@ export function ruleTemplateDirRouter(): Router {
       }
 
       const config = await loadConfig()
-      const absolute = path.isAbsolute(next)
-        ? next
-        : path.resolve(config.workspaceRoot || process.cwd(), next)
+      const absolute = path.isAbsolute(next) ? next : path.resolve(config.workspaceRoot || process.cwd(), next)
 
       // Auto-create the directory if it doesn't exist (so the UI can switch
       // before the user has written any templates).
@@ -64,7 +62,7 @@ export function ruleTemplateDirRouter(): Router {
       res.json({
         raw: absolute,
         absolute,
-        missing: false
+        missing: false,
       })
     } catch (error) {
       next(error)

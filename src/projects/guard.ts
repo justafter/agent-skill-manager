@@ -61,28 +61,22 @@ export async function assertSafeWritePath(targetPath: string, config: ResolvedCo
 
   // Check if target path is inside any allowed directories
   const isSafe =
-    allowedDirs.some(parent => isPathInside(parent, resolvedTarget)) ||
-    allowedExactPaths.some(allowedPath => path.resolve(allowedPath) === path.resolve(resolvedTarget))
+    allowedDirs.some((parent) => isPathInside(parent, resolvedTarget)) ||
+    allowedExactPaths.some((allowedPath) => path.resolve(allowedPath) === path.resolve(resolvedTarget))
 
   if (!isSafe) {
     throw new AppError(
       'PATH_OUT_OF_BOUNDS',
       `Path security violation: target path is outside allowed directories: ${targetPath}`,
-      { resolvedTarget, allowedDirs, allowedExactPaths }
+      { resolvedTarget, allowedDirs, allowedExactPaths },
     )
   }
 }
 
 export async function assertInsideProject(projectPath: string, targetPath: string): Promise<void> {
-  const [projectRoot, target] = await Promise.all([
-    realpath(projectPath),
-    resolveRealpath(targetPath)
-  ])
+  const [projectRoot, target] = await Promise.all([realpath(projectPath), resolveRealpath(targetPath)])
 
   if (!isPathInside(projectRoot, target)) {
-    throw new AppError(
-      'PATH_OUT_OF_BOUNDS',
-      `Refusing to write outside project: ${targetPath}`
-    )
+    throw new AppError('PATH_OUT_OF_BOUNDS', `Refusing to write outside project: ${targetPath}`)
   }
 }
