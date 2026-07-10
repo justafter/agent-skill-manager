@@ -1,4 +1,18 @@
 {
   "version": 1,
-  "skills": {}
+  "skills": {
+    "ep-android-development": {
+      "name": "ep-android-development",
+      "version": "0.0.0",
+      "description": "用于 Android 开发任务 - 通过 4 阶段工作流（需求分析、设计方案、实施开发、编译测试）确保正确完成 Android 功能实现、bug 修复或代码重构。特别适用于 EpointAndroid 框架项目的开发工作。",
+      "localPath": "D:\\Obsidian笔记\\Justafter的笔记\\epoint\\skills\\ep-android-development",
+      "checksum": "sha256:e1dde874118a870f0d9c358b6aa796a6090a19277da1a704c363523037073114",
+      "hasScripts": false,
+      "hasReferences": true,
+      "hasAssets": false,
+      "lastModified": "2026-07-08T01:12:23.840Z",
+      "syncedTargets": [],
+      "projectInstalls": []
+    }
+  }
 }

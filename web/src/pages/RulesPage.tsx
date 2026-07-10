@@ -28,13 +28,11 @@ const agentStyle = (agent: string) => {
 const statusBadge = (status?: string) => {
   switch (status) {
     case 'create':
-      return { label: '未创建', className: 'badge-missing' }
+      return { label: '本地未创建', className: 'badge-missing' }
     case 'identical':
       return { label: '已同步 (一致)', className: 'badge-identical' }
-    case 'block':
-      return { label: '待推送 (托管块)', className: 'badge-changed' }
-    case 'conflict':
-      return { label: '冲突 (无托管块)', className: 'badge-conflict' }
+    case 'changed':
+      return { label: '未同步 (有差异)', className: 'badge-changed' }
     default:
       return { label: status || '未知', className: 'badge-missing' }
   }
@@ -88,6 +86,59 @@ export function RulesPage() {
       setCreateMessage(`创建模板失败: ${(err as Error).message}`)
     } finally {
       setCreateSaving(false)
+    }
+  }
+
+  // Import template modal state
+  const [importDialogOpen, setImportDialogOpen] = useState(false)
+  const [importSourcePath, setImportSourcePath] = useState('')
+  const [importAgent, setImportAgent] = useState<'claude' | 'codex' | 'gemini'>('claude')
+  const [importName, setImportName] = useState('')
+  const [importSaving, setImportSaving] = useState(false)
+  const [importMessage, setImportMessage] = useState<string | null>(null)
+
+  const handleSourcePathChange = (pathStr: string) => {
+    setImportSourcePath(pathStr)
+    setImportMessage(null)
+    if (!pathStr) return
+
+    // 尝试从路径中提取文件名
+    const parts = pathStr.split(/[/\\]/)
+    const fileName = parts[parts.length - 1]
+    if (fileName && fileName.endsWith('.md')) {
+      setImportName(fileName)
+
+      // 智能推荐 Agent 类型
+      const lower = fileName.toLowerCase()
+      if (lower.includes('claude')) {
+        setImportAgent('claude')
+      } else if (lower.includes('agent') || lower.includes('codex')) {
+        setImportAgent('codex')
+      } else if (lower.includes('gemini') || lower.includes('antigravity')) {
+        setImportAgent('gemini')
+      }
+    }
+  }
+
+  const handleImportTemplate = async () => {
+    if (!importSourcePath.trim() || !importName.trim()) return
+    const name = importName.trim().endsWith('.md') ? importName.trim() : `${importName.trim()}.md`
+    try {
+      setImportSaving(true)
+      setImportMessage(null)
+      await apiPost('/api/rules/import', {
+        sourcePath: importSourcePath.trim(),
+        agent: importAgent,
+        name,
+      })
+      await refetch()
+      setImportDialogOpen(false)
+      setImportSourcePath('')
+      setImportName('')
+    } catch (err) {
+      setImportMessage(`导入模板失败: ${(err as Error).message}`)
+    } finally {
+      setImportSaving(false)
     }
   }
 
@@ -207,13 +258,12 @@ export function RulesPage() {
 
   const handlePush = async (agent: string, projectId: string) => {
     const k = keyFor(agent, projectId)
-    const plan = diffByKey[k]
-    const mode = plan?.status === 'conflict' ? 'overwrite' : 'block'
+    const mode = 'overwrite'
     try {
       setIsSyncing((s) => ({ ...s, [k]: true }))
       setSyncMessage((s) => ({ ...s, [k]: null }))
       await apiPost(`/api/projects/${projectId}/rules/sync`, { agent, mode })
-      setSyncMessage((s) => ({ ...s, [k]: `[成功] 已推送到项目 (mode=${mode})` }))
+      setSyncMessage((s) => ({ ...s, [k]: `[成功] 已推送到项目` }))
       await loadDiff(agent, projectId)
       await refetch()
     } catch (err) {
@@ -244,13 +294,11 @@ export function RulesPage() {
     projectId: string,
     sourceAgent: string,
     targetAgent: string,
-    mode: 'block' | 'overwrite' = 'block',
   ) => {
     const k = `cross:${projectId}:${sourceAgent}->${targetAgent}`
-    const verb = mode === 'overwrite' ? '完全覆写' : '替换托管块'
     if (
       !window.confirm(
-        `是否确认互推同步？\n\n源: 项目内的 ${sourceAgent.toUpperCase()} 规则文件\n目标: 同项目的 ${targetAgent.toUpperCase()} 规则文件\n模式: ${verb}\n\n注：目标文件写入前会自动备份。`,
+        `是否确认互推同步？\n\n源: 项目内的 ${sourceAgent.toUpperCase()} 规则文件\n目标: 同项目的 ${targetAgent.toUpperCase()} 规则文件\n\n这会完全覆写目标文件（目标文件写入前会自动备份）。`,
       )
     )
       return
@@ -260,11 +308,11 @@ export function RulesPage() {
       await apiPost(`/api/projects/${projectId}/rules/cross-sync`, {
         sourceAgent,
         targetAgent,
-        mode,
+        mode: 'overwrite',
       })
       setCrossMessage((s) => ({
         ...s,
-        [k]: `[成功] ${sourceAgent.toUpperCase()} → ${targetAgent.toUpperCase()} (${mode})`,
+        [k]: `[成功] ${sourceAgent.toUpperCase()} → ${targetAgent.toUpperCase()}`,
       }))
       await refetch()
     } catch (err) {
@@ -384,6 +432,19 @@ export function RulesPage() {
             }}
           >
             + 新建模板
+          </button>
+          <button
+            className="button"
+            type="button"
+            onClick={() => {
+              setImportAgent('claude')
+              setImportSourcePath('')
+              setImportName('')
+              setImportMessage(null)
+              setImportDialogOpen(true)
+            }}
+          >
+            + 导入模板
           </button>
         </div>
       </div>
@@ -560,6 +621,119 @@ export function RulesPage() {
         </div>
       )}
 
+      {importDialogOpen && (
+        <div className="modal-overlay" onClick={() => !importSaving && setImportDialogOpen(false)}>
+          <div
+            className="modal-content"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: '520px', width: '90%' }}
+          >
+            <div className="modal-header">
+              <span>导入本地 Rule 规则模板</span>
+              <button
+                type="button"
+                className="button"
+                style={{ padding: '4px 8px' }}
+                onClick={() => setImportDialogOpen(false)}
+                disabled={importSaving}
+              >
+                &times;
+              </button>
+            </div>
+
+            <div className="modal-body">
+              <p style={{ color: '#57606a', fontSize: '13px', marginBottom: '16px' }}>
+                输入外部已有的规则文件（例如 <code>.md</code> 文件）的绝对路径，系统会将其拷贝为模板库中的自定义模板。
+              </p>
+
+              <div className="form-group">
+                <label htmlFor="import-source-path">外部规则文件路径（绝对路径）</label>
+                <input
+                  id="import-source-path"
+                  type="text"
+                  className="form-input"
+                  placeholder="例如: D:\my-old-project\CLAUDE.md"
+                  value={importSourcePath}
+                  onChange={(e) => handleSourcePathChange(e.target.value)}
+                  disabled={importSaving}
+                />
+                <span style={{ fontSize: '11px', color: '#64748b', marginTop: '4px', display: 'block' }}>
+                  必须是本地可访问的 Markdown 文件绝对路径。
+                </span>
+              </div>
+
+              <div className="form-group" style={{ marginTop: '12px' }}>
+                <label>对应 Agent 类型</label>
+                <select
+                  className="form-input"
+                  value={importAgent}
+                  onChange={(e) => setImportAgent(e.target.value as any)}
+                  disabled={importSaving}
+                >
+                  <option value="claude">Claude (CLAUDE.md)</option>
+                  <option value="codex">Codex (AGENTS.md)</option>
+                  <option value="gemini">Gemini (GEMINI.md)</option>
+                </select>
+              </div>
+
+              <div className="form-group" style={{ marginTop: '12px' }}>
+                <label htmlFor="import-rule-name">目标模板名称</label>
+                <input
+                  id="import-rule-name"
+                  type="text"
+                  className="form-input"
+                  placeholder="例如: imported-react-rules.md"
+                  value={importName}
+                  onChange={(e) => {
+                    setImportName(e.target.value)
+                    setImportMessage(null)
+                  }}
+                  disabled={importSaving}
+                />
+                <span style={{ fontSize: '11px', color: '#64748b', marginTop: '4px', display: 'block' }}>
+                  必须以 <code>.md</code> 结尾。如果源文件中不包含托管块标记，系统会自动将其包裹在托管块内。
+                </span>
+              </div>
+
+              {importMessage && (
+                <div
+                  className="empty-state"
+                  style={{
+                    marginTop: '12px',
+                    padding: '10px 12px',
+                    fontSize: '13px',
+                    background: '#ffebe9',
+                    color: '#cf222e',
+                    border: '1px solid #ffc8c4',
+                  }}
+                >
+                  {importMessage}
+                </div>
+              )}
+            </div>
+
+            <div className="modal-footer">
+              <button
+                type="button"
+                className="button"
+                onClick={() => setImportDialogOpen(false)}
+                disabled={importSaving}
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                className="button button-primary"
+                onClick={handleImportTemplate}
+                disabled={importSaving || !importSourcePath.trim() || !importName.trim()}
+              >
+                {importSaving ? '导入中…' : '确认导入'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 项目规则绑定管理面板 */}
       <div
         style={{
@@ -613,46 +787,64 @@ export function RulesPage() {
                       const agentTemplates = rules.filter((r: any) => r.agent === agent)
                       return (
                         <td key={agent} style={{ padding: '8px', textAlign: 'center' }}>
-                          <select
-                            style={{
-                              padding: '4px 8px',
-                              fontSize: '12px',
-                              borderRadius: '6px',
-                              border: '1px solid #cbd5e1',
-                              background: '#ffffff',
-                              cursor: 'pointer',
-                              width: '100%',
-                              maxWidth: '180px',
-                            }}
-                            value={currentTpl}
-                            onChange={async (e) => {
-                              const val = e.target.value
-                              try {
-                                await apiPut(`/api/projects/${p.id}/rules/template`, {
-                                  agent,
-                                  templateName: val || null,
-                                })
-                                await refetch()
-                                await refetchProjects()
-
-                                // Clear cache and reload diff
-                                const k = keyFor(agent, p.id)
-                                setDiffByKey((s) => ({ ...s, [k]: null }))
-                                if (val) {
-                                  await loadDiff(agent, p.id)
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                            <select
+                              style={{
+                                padding: '4px 8px',
+                                fontSize: '12px',
+                                borderRadius: '6px',
+                                border: '1px solid #cbd5e1',
+                                background: '#ffffff',
+                                cursor: 'pointer',
+                                width: '100%',
+                                maxWidth: '180px',
+                              }}
+                              value={currentTpl}
+                              onChange={async (e) => {
+                                const val = e.target.value
+                                try {
+                                  await apiPut(`/api/projects/${p.id}/rules/template`, {
+                                    agent,
+                                    templateName: val || null,
+                                  })
+                                  await refetch()
+                                  await refetchProjects()
+  
+                                  // Clear cache and reload diff
+                                  const k = keyFor(agent, p.id)
+                                  setDiffByKey((s) => ({ ...s, [k]: null }))
+                                  if (val) {
+                                    await loadDiff(agent, p.id)
+                                  }
+                                } catch (err) {
+                                  alert(`绑定规则模板失败: ${(err as Error).message}`)
                                 }
-                              } catch (err) {
-                                alert(`绑定规则模板失败: ${(err as Error).message}`)
+                              }}
+                            >
+                              <option value="">(未关联)</option>
+                              {Array.from(new Set(rules.map((r: any) => r.name))).map((name: any) => (
+                                <option key={name} value={name}>
+                                  {name}
+                                </option>
+                              ))}
+                            </select>
+                            {(() => {
+                              const ruleFileNames = {
+                                claude: 'CLAUDE.md',
+                                codex: 'AGENTS.md',
+                                gemini: 'GEMINI.md',
                               }
-                            }}
-                          >
-                            <option value="">(未关联)</option>
-                            {agentTemplates.map((r: any) => (
-                              <option key={r.name} value={r.name}>
-                                {r.name}
-                              </option>
-                            ))}
-                          </select>
+                              const targetRuleName = ruleFileNames[agent as keyof typeof ruleFileNames]
+                              const hasLocalFile = (p.scan?.ruleFiles || []).some(
+                                (f: string) => f.endsWith(targetRuleName) || f.endsWith(targetRuleName.toLowerCase())
+                              )
+                              return (
+                                <span style={{ fontSize: '11px', color: hasLocalFile ? '#16a34a' : '#94a3b8' }}>
+                                  {hasLocalFile ? '● 本地已存在' : '○ 本地未创建'}
+                                </span>
+                              )
+                            })()}
+                          </div>
                         </td>
                       )
                     })}
@@ -1079,24 +1271,15 @@ export function RulesPage() {
                                 const busy = !!crossInProgress[k]
                                 return (
                                   <td key={tgt} style={{ textAlign: 'center', padding: '6px' }}>
-                                    <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'center' }}>
                                       <button
-                                        className="button"
-                                        style={{ padding: '2px 8px', fontSize: '12px', border: '1px solid #cbd5e1' }}
-                                        onClick={() => handleCrossSync(proj.projectId, src, tgt, 'block')}
+                                        className="button button-primary"
+                                        style={{ padding: '4px 10px', fontSize: '11px' }}
+                                        onClick={() => handleCrossSync(proj.projectId, src, tgt)}
                                         disabled={busy}
-                                        title="块模式：复用源文件受控块，推入目标 Agent 的受控块"
+                                        title="完全覆写：源文件内容整文件覆盖写入目标规则文件"
                                       >
-                                        block
-                                      </button>
-                                      <button
-                                        className="button"
-                                        style={{ padding: '2px 8px', fontSize: '12px' }}
-                                        onClick={() => handleCrossSync(proj.projectId, src, tgt, 'overwrite')}
-                                        disabled={busy}
-                                        title="覆写模式：源文件整文件覆写目标"
-                                      >
-                                        overwrite
+                                        {busy ? '正在互推...' : '推送覆盖'}
                                       </button>
                                     </div>
                                     {msg && (

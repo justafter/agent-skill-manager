@@ -3,7 +3,7 @@ import path from 'node:path'
 import { loadConfig } from '../../core/config.js'
 import { scanProject } from '../../projects/scanner.js'
 import { planRuleSync } from '../../rules/plan.js'
-import { listRuleTemplates } from '../../rules/template.js'
+import { listRuleTemplates, importRuleTemplate } from '../../rules/template.js'
 import { AppError } from '../../utils/errors.js'
 import { pathExists, ensureDir } from '../../utils/fs.js'
 import { writeFile } from 'node:fs/promises'
@@ -144,6 +144,34 @@ export function rulesRouter(): Router {
       res.json(plan)
     } catch (error) {
       next(error)
+    }
+  })
+
+  // POST /api/rules/import - Import an external rule file as a template
+  router.post('/import', async (req, res, next) => {
+    try {
+      const { sourcePath, agent, name } = req.body
+      if (!sourcePath || !agent || !name) {
+        throw new AppError('VALIDATION_ERROR', 'sourcePath, agent, and name are required.')
+      }
+      if (!name.endsWith('.md')) {
+        throw new AppError('VALIDATION_ERROR', 'Template file name must end with .md')
+      }
+      if (!['claude', 'codex', 'gemini'].includes(agent)) {
+        throw new AppError('VALIDATION_ERROR', 'Invalid agent type. Must be claude, codex, or gemini.')
+      }
+
+      const config = await loadConfig()
+      const templateDir = resolveTemplateDir(config)
+      const result = await importRuleTemplate(templateDir, sourcePath, agent, name)
+
+      res.json(result)
+    } catch (error) {
+      if (error instanceof AppError) {
+        next(error)
+      } else {
+        next(new AppError('VALIDATION_ERROR', (error as Error).message))
+      }
     }
   })
 

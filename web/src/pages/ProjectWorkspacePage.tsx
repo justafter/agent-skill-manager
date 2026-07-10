@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useApi } from '../hooks/useApi'
-import { apiGet, apiPost } from '../api/client'
+import { apiGet, apiPost, apiPut } from '../api/client'
 import { PlanResult } from '../components/PlanConfirmDialog'
 import { DiffView } from '../components/DiffView'
 
@@ -11,6 +11,7 @@ interface ProjectDetail {
   path: string
   enabledAgents: string[]
   scan?: { projectId: string; skillDirs: string[]; ruleFiles: string[] }
+  ruleTemplates?: Record<string, string>
 }
 
 interface SkillSummary {
@@ -50,13 +51,11 @@ const AGENT_TAG_STYLE: Record<string, { background: string; color: string }> = {
 function getRuleStatusMeta(status?: string) {
   switch (status) {
     case 'create':
-      return { label: '未创建', className: 'badge-missing' }
+      return { label: '本地未创建', className: 'badge-missing' }
     case 'identical':
       return { label: '已同步 (一致)', className: 'badge-identical' }
-    case 'block':
-      return { label: '待推送 (仅同步托管块)', className: 'badge-changed' }
-    case 'conflict':
-      return { label: '冲突 (无托管块)', className: 'badge-conflict' }
+    case 'changed':
+      return { label: '未同步 (有差异)', className: 'badge-changed' }
     default:
       return { label: status || '未知', className: 'badge-missing' }
   }
@@ -72,11 +71,13 @@ export function ProjectWorkspacePage() {
     refetch: refetchProjects,
   } = useApi<{ projects: ProjectDetail[] }>('projects', '/api/projects')
   const { data: skillsData } = useApi<{ skills: SkillSummary[] }>('skills', '/api/skills')
+  const { data: rulesData } = useApi<any>('rules', '/api/rules')
 
   const project = useMemo(
     () => (projectsData?.projects || []).find((p) => p.id === id) || null,
     [projectsData, id],
   )
+  const rules = rulesData?.rules || []
 
   // ----- Skill inject state -----
   const [selectedSkillName, setSelectedSkillName] = useState('')
@@ -88,12 +89,11 @@ export function ProjectWorkspacePage() {
   const [injectSuccessMessage, setInjectSuccessMessage] = useState<string | null>(null)
 
   // ----- Rule sync state -----
-  const [selectedRuleAgent, setSelectedRuleAgent] = useState('')
-  const [ruleDiff, setRuleDiff] = useState<RuleDiffResult | null>(null)
-  const [ruleOverwrite, setRuleOverwrite] = useState(false)
-  const [isFetchingRuleDiff, setIsFetchingRuleDiff] = useState(false)
-  const [isSyncingRule, setIsSyncingRule] = useState(false)
-  const [ruleMessage, setRuleMessage] = useState<{ kind: 'success' | 'error'; text: string } | null>(null)
+  const [ruleDiffs, setRuleDiffs] = useState<Record<string, RuleDiffResult | null>>({})
+  const [ruleOverwrites, setRuleOverwrites] = useState<Record<string, boolean>>({})
+  const [fetchingRuleDiffs, setFetchingRuleDiffs] = useState<Record<string, boolean>>({})
+  const [syncingRules, setSyncingRules] = useState<Record<string, boolean>>({})
+  const [ruleMessages, setRuleMessages] = useState<Record<string, { kind: 'success' | 'error'; text: string } | null>>({})
 
   // ----- Local single-project scan state (overrides project.scan for rendering) -----
   const [localScan, setLocalScan] = useState<ProjectScanResult | null>(null)
@@ -103,19 +103,24 @@ export function ProjectWorkspacePage() {
   // Initialise per-project defaults once the project is resolved.
   useEffect(() => {
     if (!project) return
-    const defaultAgent = project.enabledAgents?.[0] || 'claude'
-    setSelectedAgent(defaultAgent)
-    setSelectedRuleAgent(defaultAgent)
+    setSelectedAgent(project.enabledAgents?.[0] || 'claude')
     setSelectedSkillName('')
     setInjectPlanResult(null)
     setPlanErrorMessage(null)
     setInjectSuccessMessage(null)
     setAllowManagedModify(false)
-    setRuleDiff(null)
-    setRuleOverwrite(false)
-    setRuleMessage(null)
+    setRuleDiffs({})
+    setRuleOverwrites({})
+    setRuleMessages({})
+    setFetchingRuleDiffs({})
+    setSyncingRules({})
     setLocalScan(null)
     setRescanError(null)
+
+    // 同时获取 3 个 Agent 规则的差异
+    fetchRuleDiff(project.id, 'claude')
+    fetchRuleDiff(project.id, 'codex')
+    fetchRuleDiff(project.id, 'gemini')
   }, [project?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const skills = skillsData?.skills || []
@@ -164,68 +169,82 @@ export function ProjectWorkspacePage() {
   }
 
   // ----- Rule sync handlers -----
-  const fetchRuleDiff = async (projectId: string, agent: string) => {
+  const fetchRuleDiff = async (projectId: string, agent: string, overrideTemplateName?: string) => {
+    const templateName = overrideTemplateName !== undefined ? overrideTemplateName : project?.ruleTemplates?.[agent]
+    if (!templateName) {
+      setRuleDiffs((s) => ({ ...s, [agent]: null }))
+      setFetchingRuleDiffs((s) => ({ ...s, [agent]: false }))
+      setRuleMessages((s) => ({ ...s, [agent]: null }))
+      return
+    }
+
     try {
-      setIsFetchingRuleDiff(true)
-      setRuleMessage(null)
+      setFetchingRuleDiffs((s) => ({ ...s, [agent]: true }))
+      setRuleMessages((s) => ({ ...s, [agent]: null }))
       const res = await apiGet<RuleDiffResult>(`/api/projects/${projectId}/rules/diff?agent=${agent}`)
-      setRuleDiff(res)
+      setRuleDiffs((s) => ({ ...s, [agent]: res }))
     } catch (err) {
-      setRuleDiff(null)
-      setRuleMessage({ kind: 'error', text: `获取规则 Diff 失败: ${(err as Error).message}` })
+      setRuleDiffs((s) => ({ ...s, [agent]: null }))
+      setRuleMessages((s) => ({
+        ...s,
+        [agent]: { kind: 'error', text: `获取规则 Diff 失败: ${(err as Error).message}` },
+      }))
     } finally {
-      setIsFetchingRuleDiff(false)
+      setFetchingRuleDiffs((s) => ({ ...s, [agent]: false }))
     }
   }
 
-  useEffect(() => {
-    if (!project || !selectedRuleAgent) return
-    fetchRuleDiff(project.id, selectedRuleAgent)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [project?.id, selectedRuleAgent])
-
-  const handleRuleAgentChange = (agent: string) => {
-    setSelectedRuleAgent(agent)
-    setRuleOverwrite(false)
-  }
-
-  const handlePushRules = async () => {
-    if (!project || !selectedRuleAgent || !ruleDiff) return
-    const mode = ruleDiff.status === 'conflict' ? 'overwrite' : 'block'
+  const handlePushRules = async (agent: string) => {
+    if (!project) return
+    const diff = ruleDiffs[agent]
+    if (!diff) return
+    const mode = 'overwrite'
     try {
-      setIsSyncingRule(true)
-      setRuleMessage(null)
+      setSyncingRules((s) => ({ ...s, [agent]: true }))
+      setRuleMessages((s) => ({ ...s, [agent]: null }))
       await apiPost(`/api/projects/${project.id}/rules/sync`, {
-        agent: selectedRuleAgent,
+        agent,
         mode,
       })
-      setRuleMessage({ kind: 'success', text: `规则已成功推送至项目 "${project.name}"。` })
-      await fetchRuleDiff(project.id, selectedRuleAgent)
+      setRuleMessages((s) => ({
+        ...s,
+        [agent]: { kind: 'success', text: `规则已成功推送至项目 "${project.name}"。` },
+      }))
+      await fetchRuleDiff(project.id, agent)
       await refetchProjects()
     } catch (err) {
-      setRuleMessage({ kind: 'error', text: `推送规则失败: ${(err as Error).message}` })
+      setRuleMessages((s) => ({
+        ...s,
+        [agent]: { kind: 'error', text: `推送规则失败: ${(err as Error).message}` },
+      }))
     } finally {
-      setIsSyncingRule(false)
+      setSyncingRules((s) => ({ ...s, [agent]: false }))
     }
   }
 
-  const handlePullRules = async () => {
-    if (!project || !selectedRuleAgent) return
-    const confirmMsg = `是否确认从项目拉取规则？这将覆写更新本地的权威 ${selectedRuleAgent} 模板。`
+  const handlePullRules = async (agent: string) => {
+    if (!project) return
+    const confirmMsg = `是否确认从项目拉取规则？这将覆写更新本地的权威 ${agent} 模板。`
     if (!window.confirm(confirmMsg)) return
     try {
-      setIsSyncingRule(true)
-      setRuleMessage(null)
+      setSyncingRules((s) => ({ ...s, [agent]: true }))
+      setRuleMessages((s) => ({ ...s, [agent]: null }))
       await apiPost(`/api/projects/${project.id}/rules/sync`, {
-        agent: selectedRuleAgent,
+        agent,
         mode: 'pull',
       })
-      setRuleMessage({ kind: 'success', text: `已从项目拉取最新规则，并更新本地权威模板。` })
-      await fetchRuleDiff(project.id, selectedRuleAgent)
+      setRuleMessages((s) => ({
+        ...s,
+        [agent]: { kind: 'success', text: `已从项目拉取最新规则，并更新本地权威模板。` },
+      }))
+      await fetchRuleDiff(project.id, agent)
     } catch (err) {
-      setRuleMessage({ kind: 'error', text: `拉取规则失败: ${(err as Error).message}` })
+      setRuleMessages((s) => ({
+        ...s,
+        [agent]: { kind: 'error', text: `拉取规则失败: ${(err as Error).message}` },
+      }))
     } finally {
-      setIsSyncingRule(false)
+      setSyncingRules((s) => ({ ...s, [agent]: false }))
     }
   }
 
@@ -651,124 +670,156 @@ export function ProjectWorkspacePage() {
           推送模板、或从项目拉取回模板。
         </p>
 
-        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 16, marginBottom: 12 }}>
-          <div className="form-group" style={{ flex: 1, margin: 0 }}>
-            <label>选择 Agent 规则</label>
-            <select
-              className="form-input"
-              value={selectedRuleAgent}
-              onChange={(e) => handleRuleAgentChange(e.target.value)}
-              disabled={isFetchingRuleDiff || isSyncingRule}
-            >
-              {project.enabledAgents.map((a) => (
-                <option key={a} value={a}>
-                  {a.toUpperCase()} ({AGENT_RULE_FILE[a] || a})
-                </option>
-              ))}
-            </select>
-          </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          {['claude', 'codex', 'gemini'].map((agent) => {
+            const ruleDiff = ruleDiffs[agent]
+            const isFetchingRuleDiff = fetchingRuleDiffs[agent]
+            const isSyncingRule = syncingRules[agent]
+            const ruleOverwrite = ruleOverwrites[agent] || false
+            const ruleMessage = ruleMessages[agent]
 
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button
-              className="button"
-              style={{ border: '1px solid #cbd5e1' }}
-              onClick={handlePullRules}
-              disabled={isFetchingRuleDiff || isSyncingRule || !ruleDiff?.exists}
-            >
-              拉取规则 ↓
-            </button>
-            <button
-              className="button button-primary"
-              onClick={handlePushRules}
-              disabled={
-                isFetchingRuleDiff ||
-                isSyncingRule ||
-                !ruleDiff ||
-                ruleDiff.status === 'identical' ||
-                (ruleDiff.status === 'conflict' && !ruleOverwrite)
-              }
-            >
-              {isSyncingRule ? '正在同步...' : '推送规则模板 ↑'}
-            </button>
-          </div>
-        </div>
-
-        {isFetchingRuleDiff ? (
-          <div className="empty-state">正在计算规则文件差异...</div>
-        ) : ruleDiff ? (
-          <div>
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: 12,
-              }}
-            >
-              <div style={{ fontSize: 13, color: '#475569' }}>
-                规则同步状态：
-                <span className={`badge ${getRuleStatusMeta(ruleDiff.status).className}`} style={{ marginLeft: 8 }}>
-                  {getRuleStatusMeta(ruleDiff.status).label}
-                </span>
-              </div>
-              <div style={{ fontSize: 12, color: '#64748b' }}>
-                当前比对模板：
-                <code
-                  style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: 3 }}
-                >
-                  {ruleDiff.templateName || '未知'}
-                </code>
-              </div>
-            </div>
-
-            {ruleDiff.status === 'conflict' && (
+            return (
               <div
+                key={agent}
                 style={{
-                  background: '#fffbeb',
-                  padding: 12,
-                  borderRadius: 6,
-                  border: '1px solid #fef3c7',
-                  marginBottom: 12,
+                  border: '1px solid #e2e8f0',
+                  borderRadius: 8,
+                  padding: 16,
+                  background: '#f8fafc',
                 }}
               >
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', margin: 0 }}>
-                  <input
-                    type="checkbox"
-                    checked={ruleOverwrite}
-                    onChange={(e) => setRuleOverwrite(e.target.checked)}
-                    disabled={isSyncingRule}
-                  />
-                  <span style={{ fontSize: 13, fontWeight: 500, color: '#b45309' }}>
-                    无托管块标识，允许完全覆写 (Overwrite) 项目规则文件
+                {/* 卡片头部 */}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    borderBottom: '1px solid #e2e8f0',
+                    paddingBottom: 10,
+                    marginBottom: 12,
+                  }}
+                >
+                  <span
+                    className="skill-tag"
+                    style={{
+                      ...(AGENT_TAG_STYLE[agent] || { background: '#f1f5f9', color: '#475569' }),
+                      fontWeight: 600,
+                      fontSize: 13,
+                    }}
+                  >
+                    {agent.toUpperCase()} 规则 ({AGENT_RULE_FILE[agent]})
                   </span>
-                </label>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    {ruleDiff && (
+                      <span className={`badge ${getRuleStatusMeta(ruleDiff.status).className}`}>
+                        {getRuleStatusMeta(ruleDiff.status).label}
+                      </span>
+                    )}
+                    {(() => {
+                      const ruleFileNames = {
+                        claude: 'CLAUDE.md',
+                        codex: 'AGENTS.md',
+                        gemini: 'GEMINI.md',
+                      }
+                      const targetRuleName = ruleFileNames[agent as keyof typeof ruleFileNames]
+                      const hasLocalFile = ruleFiles.some(
+                        (f: string) => f.endsWith(targetRuleName) || f.endsWith(targetRuleName.toLowerCase())
+                      )
+                      return (
+                        <span style={{ fontSize: '12px', color: hasLocalFile ? '#16a34a' : '#94a3b8' }}>
+                          {hasLocalFile ? '● 本地已存在' : '○ 本地未创建'}
+                        </span>
+                      )
+                    })()}
+                  </div>
+                </div>
+
+                {/* 控制栏：关联模板与同步按钮 */}
+                <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: 16, marginBottom: 12 }}>
+                  <div className="form-group" style={{ flex: 1, minWidth: '200px', margin: 0 }}>
+                    <label style={{ fontSize: 12, color: '#475569', marginBottom: 4 }}>关联的规则模板</label>
+                    <select
+                      className="form-input"
+                      value={project.ruleTemplates?.[agent] || ''}
+                      onChange={async (e) => {
+                        const val = e.target.value
+                        try {
+                          await apiPut(`/api/projects/${project.id}/rules/template`, {
+                            agent,
+                            templateName: val || null,
+                          })
+                          await refetchProjects()
+                          setRuleDiffs((s) => ({ ...s, [agent]: null }))
+                          await fetchRuleDiff(project.id, agent, val)
+                        } catch (err) {
+                          alert(`绑定规则模板失败: ${(err as Error).message}`)
+                        }
+                      }}
+                      disabled={isFetchingRuleDiff || isSyncingRule}
+                      style={{ padding: '6px 10px', fontSize: 13 }}
+                    >
+                      <option value="">(未关联)</option>
+                      {Array.from(new Set(rules.map((r: any) => r.name))).map((name: any) => (
+                        <option key={name} value={name}>
+                          {name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      className="button"
+                      style={{ border: '1px solid #cbd5e1', padding: '6px 12px', fontSize: 13 }}
+                      onClick={() => handlePullRules(agent)}
+                      disabled={isFetchingRuleDiff || isSyncingRule || !ruleDiff?.exists}
+                    >
+                      拉取规则 ↓
+                    </button>
+                    <button
+                      className="button button-primary"
+                      style={{ padding: '6px 12px', fontSize: 13 }}
+                      onClick={() => handlePushRules(agent)}
+                      disabled={
+                        isFetchingRuleDiff ||
+                        isSyncingRule ||
+                        !ruleDiff ||
+                        ruleDiff.status === 'identical'
+                      }
+                    >
+                      {isSyncingRule ? '正在同步...' : '推送模板 ↑'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* 状态为空或未关联时的提示 */}
+                {!ruleDiff && (
+                  <div className="empty-state" style={{ padding: '12px 0' }}>
+                    {project.ruleTemplates?.[agent] ? '正在获取同步状态...' : '项目此 Agent 暂未关联规则模板。'}
+                  </div>
+                )}
+
+                {/* 提示消息 */}
+                {ruleMessage && (
+                  <div
+                    style={{
+                      marginTop: 12,
+                      background: ruleMessage.kind === 'success' ? '#ebfbee' : '#ffebe9',
+                      border: `1px solid ${ruleMessage.kind === 'success' ? '#c6f6d5' : '#ffc8c4'}`,
+                      color: ruleMessage.kind === 'success' ? '#22543d' : '#b91c1c',
+                      padding: '8px 12px',
+                      borderRadius: 6,
+                      fontSize: 12,
+                    }}
+                  >
+                    {ruleMessage.text}
+                  </div>
+                )}
               </div>
-            )}
-
-            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 8 }}>差异 Patch 预览：</div>
-            <div style={{ maxHeight: 240, overflowY: 'auto' }}>
-              <DiffView diff={ruleDiff.patch || ''} />
-            </div>
-          </div>
-        ) : (
-          <div className="empty-state">暂无规则同步信息。</div>
-        )}
-
-        {ruleMessage && (
-          <div
-            style={{
-              marginTop: 12,
-              background: ruleMessage.kind === 'success' ? '#ebfbee' : '#ffebe9',
-              border: `1px solid ${ruleMessage.kind === 'success' ? '#c6f6d5' : '#ffc8c4'}`,
-              color: ruleMessage.kind === 'success' ? '#22543d' : '#b91c1c',
-              padding: '10px 12px',
-              borderRadius: 6,
-              fontSize: 13,
-            }}
-          >
-            {ruleMessage.text}
-          </div>
-        )}
+            )
+          })}
+        </div>
       </div>
     </section>
   )

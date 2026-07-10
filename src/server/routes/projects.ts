@@ -188,7 +188,11 @@ export function projectsRouter(): Router {
       const planResult = await planRuleSync(p, agent as AgentId, undefined, templateDir)
       res.json(planResult)
     } catch (error) {
-      next(error)
+      if (error instanceof AppError) {
+        next(error)
+      } else {
+        next(new AppError('VALIDATION_ERROR', (error as Error).message))
+      }
     }
   })
 

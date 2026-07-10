@@ -17,7 +17,7 @@ export interface RuleSyncPlan {
   projectId: string
   agent: AgentId
   targetPath: string
-  status: 'create' | 'identical' | 'block' | 'conflict'
+  status: 'create' | 'identical' | 'changed'
   currentContent: string
   templateContent: string
   expectedContent: string
@@ -47,28 +47,19 @@ export async function planRuleSync(
   const templateContent = template.content.trim()
 
   let currentContent = ''
-  let status: 'create' | 'identical' | 'block' | 'conflict'
-  let expectedContent = ''
+  let status: 'create' | 'identical' | 'changed'
+  let expectedContent = templateContent + '\n'
 
   if (!(await pathExists(targetPath))) {
     status = 'create'
     currentContent = ''
-    expectedContent = templateContent + '\n'
   } else {
     currentContent = await readFile(targetPath, 'utf8')
-    const block = findManagedBlock(currentContent, agent)
-
-    if (block) {
-      if (block.content.trim() === templateContent) {
-        status = 'identical'
-        expectedContent = currentContent
-      } else {
-        status = 'block'
-        expectedContent = `${currentContent.slice(0, block.start)}${templateContent}${currentContent.slice(block.end)}`
-      }
+    if (currentContent.trim() === templateContent.trim()) {
+      status = 'identical'
+      expectedContent = currentContent
     } else {
-      status = 'conflict'
-      expectedContent = templateContent + '\n'
+      status = 'changed'
     }
   }
 

@@ -7,6 +7,7 @@ import { loadConfig } from '../../src/core/config.js'
 import { planRuleSync } from '../../src/rules/plan.js'
 import { applyRuleSync } from '../../src/rules/apply.js'
 import { pathExists } from '../../src/utils/fs.js'
+import { importRuleTemplate } from '../../src/rules/template.js'
 
 describe('D8 Rule Templates Sync', () => {
   let tempWorkspace: string
@@ -31,7 +32,7 @@ describe('D8 Rule Templates Sync', () => {
     // Write a dummy Claude rules template
     await writeFile(
       path.join(templateDir, 'claude', 'CLAUDE.md'),
-      '<!-- BEGIN AgentSkillManager:claude -->\nLocal authority rules\n<!-- END AgentSkillManager:claude -->\n',
+      'Local authority rules\n',
       'utf8',
     )
 
@@ -68,7 +69,7 @@ describe('D8 Rule Templates Sync', () => {
     await rm(tempWorkspace, { recursive: true, force: true })
   })
 
-  it('handles rules lifecycle: create, identical, block, conflict, overwrite, and pull', async () => {
+  it('handles rules lifecycle: create, identical, changed, overwrite, and pull', async () => {
     const config = await loadConfig(tempWorkspace)
     const project = config.projects[0]
     const targetFile = path.join(projDir, 'CLAUDE.md')
@@ -78,8 +79,8 @@ describe('D8 Rule Templates Sync', () => {
     assert.equal(plan.status, 'create')
     assert.ok(plan.patch.includes('+Local authority rules'))
 
-    // 2. Apply rules in block mode
-    await applyRuleSync('proj_test', 'claude', 'block', tempWorkspace)
+    // 2. Apply rules (push/overwrite mode)
+    await applyRuleSync('proj_test', 'claude', 'overwrite', tempWorkspace)
     assert.ok(await pathExists(targetFile))
     let content = await readFile(targetFile, 'utf8')
     assert.ok(content.includes('Local authority rules'))
@@ -88,47 +89,26 @@ describe('D8 Rule Templates Sync', () => {
     plan = await planRuleSync(project, 'claude', tempWorkspace)
     assert.equal(plan.status, 'identical')
 
-    // 4. Modify block content in project -> status should be 'block'
-    const modifiedContent =
-      '<!-- BEGIN AgentSkillManager:claude -->\nUser modified rules\n<!-- END AgentSkillManager:claude -->\n'
-    const userCustomComment = '# Custom Project Rules\n'
-    await writeFile(targetFile, userCustomComment + modifiedContent, 'utf8')
+    // 4. Modify content in project -> status should be 'changed'
+    const modifiedContent = 'User modified rules\n'
+    await writeFile(targetFile, modifiedContent, 'utf8')
 
     plan = await planRuleSync(project, 'claude', tempWorkspace)
-    assert.equal(plan.status, 'block')
+    assert.equal(plan.status, 'changed')
 
-    // 5. Apply rules in block mode -> block is replaced but userCustomComment must be preserved!
-    await applyRuleSync('proj_test', 'claude', 'block', tempWorkspace)
-    content = await readFile(targetFile, 'utf8')
-    assert.ok(content.includes('Local authority rules'))
-    assert.ok(content.includes('# Custom Project Rules')) // Preserved!
-    assert.ok(!content.includes('User modified rules'))
-
-    // 6. Delete managed block but leave the file -> status should be 'conflict'
-    await writeFile(targetFile, '# Custom Project Rules\nSome unmanaged text', 'utf8')
-    plan = await planRuleSync(project, 'claude', tempWorkspace)
-    assert.equal(plan.status, 'conflict')
-
-    // 7. Apply overwrite -> file is completely replaced with template content
+    // 5. Apply overwrite -> file is completely replaced with template content
     await applyRuleSync('proj_test', 'claude', 'overwrite', tempWorkspace)
     content = await readFile(targetFile, 'utf8')
-    assert.equal(
-      content.trim(),
-      '<!-- BEGIN AgentSkillManager:claude -->\nLocal authority rules\n<!-- END AgentSkillManager:claude -->',
-    )
+    assert.equal(content.trim(), 'Local authority rules')
 
-    // 8. Pull from project back to local template
+    // 6. Pull from project back to local template
     // Let's modify block in project
-    await writeFile(
-      targetFile,
-      '<!-- BEGIN AgentSkillManager:claude -->\nNew pulled rules\n<!-- END AgentSkillManager:claude -->\n',
-      'utf8',
-    )
+    await writeFile(targetFile, 'New pulled rules\n', 'utf8')
     await applyRuleSync('proj_test', 'claude', 'pull', tempWorkspace)
 
-    // Local template should be updated
+    // Local template should be updated with the entire content
     const templateContent = await readFile(path.join(templateDir, 'claude', 'CLAUDE.md'), 'utf8')
-    assert.ok(templateContent.includes('New pulled rules'))
+    assert.equal(templateContent.trim(), 'New pulled rules')
   })
 
   it('supports custom templates per project with name translation', async () => {
@@ -136,7 +116,7 @@ describe('D8 Rule Templates Sync', () => {
     const customTplPath = path.join(templateDir, 'claude', 'react-frontend.md')
     await writeFile(
       customTplPath,
-      '<!-- BEGIN AgentSkillManager:claude -->\nReact frontend rules authority\n<!-- END AgentSkillManager:claude -->\n',
+      'React frontend rules authority\n',
       'utf8',
     )
 
@@ -158,7 +138,6 @@ describe('D8 Rule Templates Sync', () => {
     await writeFile(path.join(tempWorkspace, 'skill-manager.config.json'), JSON.stringify(newConfig, null, 2))
 
     // Refresh memory config
-    const refreshedConfig = await loadConfig(tempWorkspace)
     const targetFile = path.join(projDir, 'CLAUDE.md')
 
     // Clean up project rule file
@@ -171,8 +150,8 @@ describe('D8 Rule Templates Sync', () => {
     assert.equal(plan.status, 'create')
     assert.ok(plan.patch.includes('+React frontend rules authority'))
 
-    // 4. Apply rules in block mode -> writes to CLAUDE.md (translation)
-    await applyRuleSync('proj_custom_tpl', 'claude', 'block', tempWorkspace)
+    // 4. Apply rules -> writes to CLAUDE.md (translation)
+    await applyRuleSync('proj_custom_tpl', 'claude', 'overwrite', tempWorkspace)
     assert.ok(await pathExists(targetFile))
     let content = await readFile(targetFile, 'utf8')
     assert.ok(content.includes('React frontend rules authority'))
@@ -180,12 +159,40 @@ describe('D8 Rule Templates Sync', () => {
     // 5. Pull changes back -> updates react-frontend.md (translation)
     await writeFile(
       targetFile,
-      '<!-- BEGIN AgentSkillManager:claude -->\nEvolved react frontend rules\n<!-- END AgentSkillManager:claude -->\n',
+      'Evolved react frontend rules\n',
       'utf8',
     )
     await applyRuleSync('proj_custom_tpl', 'claude', 'pull', tempWorkspace)
 
     const updatedTplContent = await readFile(customTplPath, 'utf8')
-    assert.ok(updatedTplContent.includes('Evolved react frontend rules'))
+    assert.equal(updatedTplContent.trim(), 'Evolved react frontend rules')
+  })
+
+  it('supports importing external rule templates', async () => {
+    const extFilePath1 = path.join(tempWorkspace, 'external-rules-1.md')
+
+    // 1. 普通文件
+    await writeFile(extFilePath1, '# External Rules 1\nSome rule content\n', 'utf8')
+
+    // 导入普通文件
+    const res1 = await importRuleTemplate(templateDir, extFilePath1, 'claude', 'imported-1.md')
+    assert.equal(res1.success, true)
+    assert.ok(await pathExists(res1.path))
+    const importedContent1 = await readFile(res1.path, 'utf8')
+    // 应该是原样导入，不再被包裹托管块标记
+    assert.ok(!importedContent1.includes('<!-- BEGIN AgentSkillManager:claude -->'))
+    assert.ok(importedContent1.includes('# External Rules 1'))
+
+    // 异常流程：源路径存在
+    await assert.rejects(
+      importRuleTemplate(templateDir, path.join(tempWorkspace, 'non-existent.md'), 'claude', 'imported-3.md'),
+      /源规则文件不存在/,
+    )
+
+    // 异常流程：目标模板已存在
+    await assert.rejects(
+      importRuleTemplate(templateDir, extFilePath1, 'claude', 'imported-1.md'),
+      /规则模板库中已存在同名模板/,
+    )
   })
 })

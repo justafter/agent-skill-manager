@@ -51,15 +51,7 @@ export async function applyRuleSync(
     }
 
     const currentContent = await readFile(targetPath, 'utf8')
-    const block = findManagedBlock(currentContent, agent)
-    let newTemplateContent = ''
-
-    if (block) {
-      newTemplateContent = block.content.trim() + '\n'
-    } else {
-      // If no managed block, we do NOT extract. We throw error to prevent corrupting local templates.
-      throw new Error(`Project rules file does not contain a managed block to pull: ${targetPath}`)
-    }
+    const newTemplateContent = currentContent.trimEnd() + '\n'
 
     // Backup local template first
     if (await pathExists(templatePath)) {
@@ -94,25 +86,8 @@ export async function applyRuleSync(
       )
     }
 
-    if (mode === 'overwrite') {
-      await writeFile(targetPath, templateContent + '\n', 'utf8')
-    } else if (mode === 'block') {
-      if (!(await pathExists(targetPath))) {
-        await writeFile(targetPath, templateContent + '\n', 'utf8')
-      } else {
-        const currentContent = await readFile(targetPath, 'utf8')
-        const block = findManagedBlock(currentContent, agent)
-        let finalContent = ''
-
-        if (block) {
-          finalContent = `${currentContent.slice(0, block.start)}${templateContent}${currentContent.slice(block.end)}`
-        } else {
-          // If no block exists, block mode appends it to the end
-          finalContent = `${currentContent.trimEnd()}\n\n${templateContent}\n`
-        }
-        await writeFile(targetPath, finalContent, 'utf8')
-      }
-    }
+    // Direct whole-file overwrite
+    await writeFile(targetPath, templateContent + '\n', 'utf8')
   }
 }
 
@@ -194,34 +169,8 @@ export async function crossSyncRule(
     )
   }
 
-  if (mode === 'overwrite') {
-    await writeFile(targetPath, sourceContent, 'utf8')
-    return
-  }
-
-  // mode === 'block'
-  const sourceBlock = findManagedBlock(sourceContent, sourceAgent)
-  if (!sourceBlock) {
-    throw new Error(
-      `crossSyncRule: source file has no managed block for "${sourceAgent}". ` +
-        `Run overwrite mode or add a managed block to ${sourceFile} first.`,
-    )
-  }
-  const targetBlockContent = sourceBlock.content
-  // Extract inner content (without the BEGIN/END markers) so we can re-emit
-  // it as a managed block scoped to the target agent.
-  const innerContent = extractInner(targetBlockContent, sourceAgent)
-
-  if (!(await pathExists(targetPath))) {
-    const wrapped = `<!-- BEGIN AgentSkillManager:${targetAgent} -->\n${innerContent}\n<!-- END AgentSkillManager:${targetAgent} -->\n`
-    await writeFile(targetPath, wrapped, 'utf8')
-    return
-  }
-
-  const currentTargetContent = await readFile(targetPath, 'utf8')
-  const nextBlock = `<!-- BEGIN AgentSkillManager:${targetAgent} -->\n${innerContent}\n<!-- END AgentSkillManager:${targetAgent} -->`
-  const finalContent = replaceManagedBlock(currentTargetContent, targetAgent, nextBlock)
-  await writeFile(targetPath, finalContent, 'utf8')
+  // Direct whole-file overwrite for cross-agent sync
+  await writeFile(targetPath, sourceContent, 'utf8')
 }
 
 function extractInner(block: string, agent: AgentId): string {

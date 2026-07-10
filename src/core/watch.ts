@@ -213,7 +213,7 @@ export async function runRuleScan(root = process.cwd()) {
       }
       try {
         const plan = await planRuleSync(project, agent, root)
-        if (plan.status === 'block' || plan.status === 'conflict') {
+        if (plan.status === 'changed') {
           newChanges.push({
             projectId: project.id,
             agent,

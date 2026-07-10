@@ -12,3 +12,5 @@ library/skills/*
 *.tsbuildinfo
 .claude/settings.local.json
 .claude/launch.json
+.playwright-cli/
+.stitch/

@@ -292,17 +292,8 @@ export function registerProjectCommand(program: Command): void {
           process.exit(1)
         }
 
-        // Generate plan to check for conflict
-        const plan = await planRuleSync(p, agent)
-        if (plan.status === 'conflict' && mode === 'block') {
-          console.error(
-            `Error: Target file exists but has no managed block. Please specify --mode overwrite to overwrite it.`,
-          )
-          process.exit(1)
-        }
-
         await applyRuleSync(projectId, agent, mode)
-        console.log(`[+] Rules template pushed successfully to ${p.name} using mode: ${mode}`)
+        console.log(`[+] Rules template pushed successfully to ${p.name}`)
       } catch (error) {
         console.error('Push rules failed:', (error as Error).message)
         process.exit(1)
