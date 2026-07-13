@@ -6,12 +6,34 @@ import { expandUserProfile } from '../utils/paths.js'
 import { pathExists, atomicWriteJson, atomicWriteFile } from '../utils/fs.js'
 import { AppError } from '../utils/errors.js'
 
+type DeepPartial<T> = {
+  [Key in keyof T]?: T[Key] extends readonly unknown[]
+    ? T[Key]
+    : T[Key] extends object
+      ? DeepPartial<T[Key]>
+      : T[Key]
+}
+
 const targetSchema = z.object({
   enabled: z.boolean(),
   userSkillPath: z.string(),
   projectSkillPath: z.string(),
   projectRuleFile: z.string(),
 })
+
+const sessionAgentSchema = z.object({
+  enabled: z.boolean(),
+  root: z.string(),
+})
+
+const defaultSessionsConfig = {
+  archiveDir: '',
+  agents: {
+    claude: { enabled: true, root: '%USERPROFILE%/.claude' },
+    codex: { enabled: true, root: '%USERPROFILE%/.codex' },
+    gemini: { enabled: true, root: '%USERPROFILE%/.gemini/antigravity/brain' },
+  },
+}
 
 const configSchema = z.object({
   backupDir: z.string(),
@@ -26,6 +48,16 @@ const configSchema = z.object({
     codex: targetSchema,
     gemini: targetSchema,
   }),
+  sessions: z
+    .object({
+      archiveDir: z.string(),
+      agents: z.object({
+        claude: sessionAgentSchema,
+        codex: sessionAgentSchema,
+        gemini: sessionAgentSchema,
+      }),
+    })
+    .default(defaultSessionsConfig),
   projects: z.array(
     z.object({
       id: z.string(),
@@ -128,7 +160,7 @@ export async function loadConfig(root = process.cwd()): Promise<ResolvedConfig> 
   }
 }
 
-export async function saveConfig(userConfigUpdates: Partial<ResolvedConfig>): Promise<void> {
+export async function saveConfig(userConfigUpdates: DeepPartial<ResolvedConfig>): Promise<void> {
   const userPath = getUserConfigPath()
   let existingUserConfig: any = {}
   if (await pathExists(userPath)) {
@@ -168,6 +200,24 @@ function resolveConfigPaths(root: string, config: ResolvedConfig): ResolvedConfi
       gemini: {
         ...config.targets.gemini,
         userSkillPath: resolveTokenPath(root, config.targets.gemini.userSkillPath),
+      },
+    },
+    sessions: {
+      ...config.sessions,
+      archiveDir: resolveTokenPath(root, config.sessions.archiveDir),
+      agents: {
+        claude: {
+          ...config.sessions.agents.claude,
+          root: resolveTokenPath(root, config.sessions.agents.claude.root),
+        },
+        codex: {
+          ...config.sessions.agents.codex,
+          root: resolveTokenPath(root, config.sessions.agents.codex.root),
+        },
+        gemini: {
+          ...config.sessions.agents.gemini,
+          root: resolveTokenPath(root, config.sessions.agents.gemini.root),
+        },
       },
     },
   }

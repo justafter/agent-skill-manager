@@ -10,6 +10,7 @@ import { registerRestoreCommand } from './restore.js'
 import { registerScanCommand } from './scan.js'
 import { registerSyncCommand } from './sync.js'
 import { registerWatchCommand } from './watch.js'
+import { registerSessionsCommand } from './sessions.js'
 
 const program = new Command()
 
@@ -25,5 +26,6 @@ registerBackupCommand(program)
 registerRestoreCommand(program)
 registerProjectCommand(program)
 registerDoctorCommand(program)
+registerSessionsCommand(program)
 
 await program.parseAsync(process.argv)

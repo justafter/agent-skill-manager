@@ -26,5 +26,22 @@
       "projectRuleFile": "GEMINI.md"
     }
   },
+  "sessions": {
+    "archiveDir": "",
+    "agents": {
+      "claude": {
+        "enabled": true,
+        "root": "%USERPROFILE%/.claude"
+      },
+      "codex": {
+        "enabled": true,
+        "root": "%USERPROFILE%/.codex"
+      },
+      "gemini": {
+        "enabled": true,
+        "root": "%USERPROFILE%/.gemini/antigravity/brain"
+      }
+    }
+  },
   "projects": []
 }

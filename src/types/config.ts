@@ -13,12 +13,23 @@ export interface ServerConfig {
   port: number
 }
 
+export interface SessionAgentConfig {
+  enabled: boolean
+  root: string
+}
+
+export interface SessionManagementConfig {
+  archiveDir: string
+  agents: Record<AgentId, SessionAgentConfig>
+}
+
 export interface AppConfig {
   backupDir: string
   devDir: string
   ruleTemplateDir: string
   server: ServerConfig
   targets: Record<AgentId, TargetConfig>
+  sessions: SessionManagementConfig
   projects: Project[]
 }
 

@@ -1052,3 +1052,24 @@ Gemini 项目规则文件：
 - 本笔记只记录计划，不代表已经创建 `D:\AgentSkillManager`。
 - 后续开始开发前，应先确认仓库位置、技术栈、项目级写入策略和首版验收标准。
 - 若首版只服务本机，不需要先做安装包或远程发布机制。
+
+## D11 会话记录迁移与管理（2026-07-13 新增）
+
+实现状态：核心功能与自动化验证已完成，待用户配置真实归档目录后进行三个 Agent 的关闭态迁移、还原和重新打开验收。
+
+在 Skill、Rule、项目工作区和备份能力之外，新增独立的会话管理模块，用于将 Claude Code、Codex、Gemini / Antigravity 的历史会话安全迁移到外部归档目录，并按需还原到原 Agent 目录。
+
+确认范围：
+
+- Claude 按 `~/.claude/projects` 下的 session JSONL 与同 UUID 配套目录迁移，不清空 `history.jsonl`。
+- Codex 按 `sessions` / `archived_sessions` 下的 rollout JSONL 迁移，不修改索引和 SQLite。
+- Gemini 按 `brain/<uuid>` 整目录迁移，非 UUID 目录不纳入。
+- 所有操作必须走 plan/apply、路径保护、活动状态检查、checksum 校验和可恢复操作日志。
+- 跨盘“移动”实现为 copy → verify → commit → delete，归档校验成功前禁止删除源。
+- 首版还原目标存在时直接拒绝，不合并、不覆盖。
+- 展示层参考 cc-switch 的“紧凑列表 + 列表/分类切换 + 当前会话详情”信息层级：分类视图按 Agent → 项目目录折叠，点击会话可按需查看真实 transcript；保留本项目 Agent 目录/归档目录双侧模型，不引入永久删除或终端恢复能力。
+
+详细设计和任务拆分见：
+
+- `3、详细设计/会话记录迁移与恢复.md`
+- `4、计划/D11会话记录迁移与恢复开发计划.md`

@@ -4,6 +4,7 @@ import { ProjectSpacePage } from './pages/ProjectSpacePage'
 import { ProjectWorkspacePage } from './pages/ProjectWorkspacePage'
 import { RulesPage } from './pages/RulesPage'
 import { SkillsPage } from './pages/SkillsPage'
+import { SessionsPage } from './pages/SessionsPage'
 
 export function App() {
   return (
@@ -15,6 +16,7 @@ export function App() {
           <NavLink to="/rules">Rule 模板库</NavLink>
           <NavLink to="/projects">项目空间</NavLink>
           <NavLink to="/backups">备份管理</NavLink>
+          <NavLink to="/sessions">会话管理</NavLink>
         </nav>
       </header>
 
@@ -24,6 +26,7 @@ export function App() {
         <Route path="/projects" element={<ProjectSpacePage />} />
         <Route path="/projects/:id" element={<ProjectWorkspacePage />} />
         <Route path="/backups" element={<BackupPage />} />
+        <Route path="/sessions" element={<SessionsPage />} />
       </Routes>
     </main>
   )

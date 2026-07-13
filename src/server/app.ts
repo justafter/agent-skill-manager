@@ -14,6 +14,7 @@ import { syncRouter } from './routes/sync.js'
 import { watchRouter } from './routes/watch.js'
 import { rulesWatchRouter } from './routes/rules-watch.js'
 import { errorHandler } from './middleware/errors.js'
+import { sessionsRouter } from './routes/sessions.js'
 
 export function createApp(): express.Express {
   const app = express()
@@ -33,6 +34,7 @@ export function createApp(): express.Express {
   app.use('/api/rules/watch', rulesWatchRouter())
   app.use('/api/watch', watchRouter())
   app.use('/api/projects', projectsRouter())
+  app.use('/api/sessions', sessionsRouter())
 
   app.use(errorHandler)
 

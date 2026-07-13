@@ -375,3 +375,16 @@ applyRuleUpdate(...)      → RuleApplyResult         // 规则写入结果
 - dry-run 不产生任何文件变更。
 - 目标端存在非本工具管理的同名 Skill 时不覆盖并提示。
 - CLI 与 UI 对同一份 `library/registry.json` / `~/.skill-manager/config.json` 读写结果一致。
+
+## 9. D11 会话管理子系统
+
+D11 在现有 Skill Adapter 之外增加独立的 `src/sessions` 领域模块：
+
+- Session Adapter 只负责识别 Agent 会话、补充元数据和计算安全相对路径。
+- Session Core 负责扫描、统计、plan/apply、manifest、完整性校验和持久化操作日志。
+- 迁移采用 staging + checksum + 原子发布 + 删除源的提交协议。
+- manifest 中的绝对源路径只用于审计，还原路径必须由当前配置根和安全相对路径计算。
+- Claude、Codex 的索引文件和所有 Agent 数据库保持只读。
+- Server、CLI、Web UI 只调用 Session Core，不重复文件写入逻辑。
+
+详见 `3、详细设计/会话记录迁移与恢复.md`。

@@ -1,4 +1,5 @@
 import type { Request, Response, NextFunction } from 'express'
+import { ZodError } from 'zod'
 import { AppError } from '../../utils/errors.js'
 import { logger } from '../../utils/logger.js'
 
@@ -28,6 +29,21 @@ const KNOWN_HTTP_STATUS: Record<string, number> = {
   CONFIRMATION_REQUIRED: 400,
   SKILL_ALREADY_EXISTS: 409,
   NOT_FOUND: 404,
+  SESSION_NOT_FOUND: 404,
+  SESSION_ARCHIVE_NOT_CONFIGURED: 400,
+  SESSION_CONFIG_CONFLICT: 400,
+  SESSION_BUSY: 409,
+  SESSION_ACTIVITY_UNKNOWN: 409,
+  SESSION_SYMLINK_UNSUPPORTED: 400,
+  SESSION_ENTRY_UNSUPPORTED: 400,
+  ARCHIVE_CONFLICT: 409,
+  RESTORE_CONFLICT: 409,
+  RESTORE_STAGING_CONFLICT: 409,
+  SOURCE_CHANGED: 409,
+  INTEGRITY_CHECK_FAILED: 409,
+  INSUFFICIENT_SPACE: 507,
+  INVALID_MANIFEST: 400,
+  NO_APPLICABLE_ITEMS: 400,
 }
 
 const FALLBACK_STATUS = 500
@@ -47,6 +63,17 @@ export function errorHandler(
         code: err.code,
         message: err.message,
         details: err.details,
+      },
+    })
+    return
+  }
+
+  if (err instanceof ZodError) {
+    res.status(400).json({
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: 'Request validation failed.',
+        details: err.flatten(),
       },
     })
     return

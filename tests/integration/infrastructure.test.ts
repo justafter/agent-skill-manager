@@ -68,6 +68,14 @@ describe('D0 Infrastructure', () => {
             enabled: false,
           },
         },
+        sessions: {
+          archiveDir: '',
+          agents: {
+            claude: { enabled: true, root: path.join(tempDir, '.claude') },
+            codex: { enabled: true, root: path.join(tempDir, '.codex') },
+            gemini: { enabled: true, root: path.join(tempDir, '.gemini', 'antigravity', 'brain') },
+          },
+        },
         projects: [
           {
             id: 'test-project',
