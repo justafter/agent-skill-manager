@@ -1066,6 +1066,7 @@ Gemini 项目规则文件：
 - Gemini 按 `brain/<uuid>` 整目录迁移，非 UUID 目录不纳入。
 - 所有操作必须走 plan/apply、路径保护、活动状态检查、checksum 校验和可恢复操作日志。
 - 跨盘“移动”实现为 copy → verify → commit → delete，归档校验成功前禁止删除源。
+- 首次运行默认使用 `D:\AgentSessionArchive` 作为统一归档目录；用户通过 UI / CLI 保存的绝对路径继续优先于默认值。
 - 首版还原目标存在时直接拒绝，不合并、不覆盖。
 - 展示层参考 cc-switch 的“紧凑列表 + 列表/分类切换 + 当前会话详情”信息层级：分类视图按 Agent → 项目目录折叠，点击会话可按需查看真实 transcript；保留本项目 Agent 目录/归档目录双侧模型，不引入永久删除或终端恢复能力。
 

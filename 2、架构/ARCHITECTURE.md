@@ -381,10 +381,11 @@ applyRuleUpdate(...)      → RuleApplyResult         // 规则写入结果
 D11 在现有 Skill Adapter 之外增加独立的 `src/sessions` 领域模块：
 
 - Session Adapter 只负责识别 Agent 会话、补充元数据和计算安全相对路径。
-- Session Core 负责扫描、统计、plan/apply、manifest、完整性校验和持久化操作日志。
+- Session Core 负责扫描、统计、transcript 只读解析、plan/apply、manifest、完整性校验和持久化操作日志。
 - 迁移采用 staging + checksum + 原子发布 + 删除源的提交协议。
 - manifest 中的绝对源路径只用于审计，还原路径必须由当前配置根和安全相对路径计算。
 - Claude、Codex 的索引文件和所有 Agent 数据库保持只读。
+- 会话正文通过共享解析器按需加载；Server 仅暴露已扫描 UUID 记录，Web 不直接读取本地文件，并过滤内部 thinking/reasoning/developer 指令。
 - Server、CLI、Web UI 只调用 Session Core，不重复文件写入逻辑。
 
 详见 `3、详细设计/会话记录迁移与恢复.md`。

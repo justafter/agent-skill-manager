@@ -27,7 +27,7 @@ const sessionAgentSchema = z.object({
 })
 
 const defaultSessionsConfig = {
-  archiveDir: '',
+  archiveDir: 'D:\\AgentSessionArchive',
   agents: {
     claude: { enabled: true, root: '%USERPROFILE%/.claude' },
     codex: { enabled: true, root: '%USERPROFILE%/.codex' },

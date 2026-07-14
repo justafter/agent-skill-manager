@@ -27,7 +27,7 @@
     }
   },
   "sessions": {
-    "archiveDir": "",
+    "archiveDir": "D:\\AgentSessionArchive",
     "agents": {
       "claude": {
         "enabled": true,

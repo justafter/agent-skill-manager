@@ -59,6 +59,11 @@ describe('D0 Infrastructure', () => {
   })
 
   describe('Configuration Merge & Save', () => {
+    it('provides a default session archive directory when the user has no override', async () => {
+      const config = await loadConfig(process.cwd())
+      assert.equal(config.sessions.archiveDir, path.normalize('D:\\AgentSessionArchive'))
+    })
+
     it('deep merges user config on top of base config', async () => {
       const userConfigPath = getUserConfigPath()
       const userConfigData = {
@@ -99,6 +104,8 @@ describe('D0 Infrastructure', () => {
       assert.equal(config.targets.claude.enabled, false)
       // Claude non-overridden options are inherited
       assert.equal(config.targets.claude.projectRuleFile, 'CLAUDE.md')
+      // An explicit user override can still disable the default archive directory
+      assert.equal(config.sessions.archiveDir, '')
       // Project workspace list is loaded
       assert.equal(config.projects.length, 1)
       assert.equal(config.projects[0].id, 'test-project')

@@ -4,12 +4,14 @@ import { mkdir, readFile, readdir, rm, stat, utimes, writeFile } from 'node:fs/p
 import path from 'node:path'
 import os from 'node:os'
 import { mkdtemp } from 'node:fs/promises'
+import { once } from 'node:events'
 import { scanSessions } from '../../src/sessions/scan.js'
 import { createMigratePlan, createRestorePlan } from '../../src/sessions/plan.js'
 import { applySessionPlan } from '../../src/sessions/apply.js'
 import { listOperationLogs } from '../../src/sessions/operation-journal.js'
 import { loadSessionConversation } from '../../src/sessions/conversation.js'
 import { pathExists } from '../../src/utils/fs.js'
+import { createApp } from '../../src/server/app.js'
 
 describe('D11 session migration and restore', () => {
   let root: string
@@ -234,6 +236,36 @@ describe('D11 session migration and restore', () => {
     assert.deepEqual(conversation.messages.map((message) => message.role), ['user', 'assistant', 'tool', 'tool'])
     assert.ok(!conversation.messages.some((message) => message.content.includes('must stay hidden')))
     assert.ok(!conversation.messages.some((message) => message.content.includes('duplicated context')))
+  })
+
+  it('serves selected conversation messages through the read-only API', async () => {
+    const id = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'
+    const projectDir = path.join(claudeRoot, 'projects', 'D--Api')
+    await mkdir(projectDir, { recursive: true })
+    await writeFile(
+      path.join(projectDir, `${id}.jsonl`),
+      `${JSON.stringify({ type: 'user', uuid: 'api-message', message: { role: 'user', content: 'API question' } })}\n`,
+    )
+    await ageTree(projectDir)
+
+    const originalCwd = process.cwd()
+    process.chdir(root)
+    const server = createApp().listen(0, '127.0.0.1')
+    try {
+      await once(server, 'listening')
+      const address = server.address()
+      assert.ok(address && typeof address === 'object')
+      const response = await fetch(`http://127.0.0.1:${address.port}/api/sessions/claude/agent/${id}/messages`)
+      assert.equal(response.status, 200)
+      const conversation = await response.json() as { messages: Array<{ role: string; content: string }> }
+      assert.deepEqual(conversation.messages, [{ id: 'api-message', role: 'user', content: 'API question' }])
+
+      const invalid = await fetch(`http://127.0.0.1:${address.port}/api/sessions/claude/agent/not-a-uuid/messages`)
+      assert.equal(invalid.status, 400)
+    } finally {
+      await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()))
+      process.chdir(originalCwd)
+    }
   })
 
   it('plans, migrates and restores a Gemini session without deleting before verification', async () => {
